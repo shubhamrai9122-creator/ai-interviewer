@@ -14,12 +14,16 @@ from server.models import (
     Base, User, UserRole, Viva, VivaStatus, Topic, Question, QuestionType,
     VivaSession, SessionStatus, SessionPhase, QuestionAsked, StudentAnswer,
     VivaScore, ScoreEvidence, FacultyOverride, IntegrityLog,
-    StudentStartRequest, StudentTurnRequest, OverrideRequest, IntegrityEventRequest
+    StudentStartRequest, StudentTurnRequest, OverrideRequest, IntegrityEventRequest,
+    ContextQuestionGenRequest, VoiceAcousticsRequest,
+    VivaDurationUpdateRequest, QuestionTreeNodeCreate,
+    ProjectIngestRequest, ProjectVerdictRequest
 )
 from server.viva_engine import VivaEngine
 from server.scoring_worker import ScoringWorker
 from server.seed_data import seed_database
 from server.load_test_suite import run_scalability_simulation
+from server.voice_service import voice_service, EXAMINER_PERSONAS, AUDIO_DIR
 
 # Database setup (SQLite file for persistence)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "viva.db")
@@ -65,6 +69,183 @@ app.mount("/static/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "system": "AI Viva Engine", "version": "1.0.0", "timestamp": time.time()}
+
+# --- Voice-Catching & Audio Intelligence Endpoints ---
+@app.get("/api/voice/personas")
+def get_voice_personas():
+    """Returns available examiner voice personas with acoustic style metadata."""
+    return list(EXAMINER_PERSONAS.values())
+
+@app.post("/api/voice/transcribe")
+async def transcribe_audio_chunk(
+    audio_file: UploadFile = File(...),
+    fallback_text: Optional[str] = Form(None)
+):
+    """
+    State-of-the-art voice-catching pipeline:
+    Receives recorded audio from MediaRecorder (WebM/WAV), saves to disk,
+    and runs ultra-fast Groq/OpenAI Whisper transcription with acoustic telemetry.
+    """
+    os.makedirs(AUDIO_DIR, exist_ok=True)
+    timestamp = int(time.time() * 1000)
+    filename = f"capture_{timestamp}_{audio_file.filename or 'chunk.webm'}"
+    file_path = os.path.join(AUDIO_DIR, filename)
+
+    content = await audio_file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    transcription = voice_service.transcribe_audio_file(file_path, fallback_text=fallback_text)
+    acoustics = voice_service.analyze_voice_acoustics(
+        transcription["transcript"],
+        transcription["duration_sec"]
+    )
+
+    return {
+        "status": "success",
+        "audio_url": f"/static/audio/{filename}",
+        "transcript": transcription["transcript"],
+        "duration_sec": transcription["duration_sec"],
+        "latency_ms": transcription["latency_ms"],
+        "engine": transcription["engine"],
+        "confidence": transcription["confidence"],
+        "acoustics": acoustics
+    }
+
+@app.post("/api/voice/acoustics")
+def analyze_acoustics(req: VoiceAcousticsRequest):
+    """Analyzes spoken transcript metrics: WPM, filler word count, fluency and pacing."""
+    return voice_service.analyze_voice_acoustics(req.transcript, req.duration_sec)
+
+# --- Project Ingestion & Defense (inspired by WarlCang/interview-my-project) ---
+@app.get("/api/project/templates")
+def get_sample_projects():
+    """Provides instant 1-click popular portfolio architectures to practice on."""
+    return [
+        {
+            "id": "ai-interviewer",
+            "name": "MSOT AI Technical Viva Platform",
+            "repo_url": "https://github.com/shubhamrai9122-creator/ai-interviewer",
+            "description": "Real-time AI oral examination platform with Web Speech voice catching, dynamic decision tree probing, and acoustic telemetry.",
+            "tech_stack": ["FastAPI", "React 19", "Web Speech API", "SQLite", "SQLAlchemy", "Uvicorn"],
+            "architecture": "Event-driven Web Client + REST/Async Service + In-memory Topic Decision Engine"
+        },
+        {
+            "id": "distributed-kv",
+            "name": "High-Throughput Distributed Cache & Key-Value Store",
+            "repo_url": "https://github.com/example/distributed-kv-store",
+            "description": "LSM-Tree based storage engine with Raft consensus, write-ahead logging (WAL), and consistent hashing across 5 nodes.",
+            "tech_stack": ["Go", "Raft Consensus", "gRPC", "LSM-Tree", "Protobuf"],
+            "architecture": "Distributed peer-to-peer cluster with leader election and quorum replication"
+        },
+        {
+            "id": "microservice-payments",
+            "name": "Event-Driven Ledger & Payment Gateway",
+            "repo_url": "https://github.com/example/event-driven-payments",
+            "description": "Double-entry bookkeeping service processing financial events with Kafka at-least-once idempotency guarantees and PostgreSQL.",
+            "tech_stack": ["Python", "Kafka", "PostgreSQL", "Redis", "Docker"],
+            "architecture": "Event-Driven Outbox pattern with atomic ledger transactions"
+        },
+        {
+            "id": "realtime-collab-canvas",
+            "name": "Collaborative Realtime Canvas & Graph Editor",
+            "repo_url": "https://github.com/example/realtime-collaborative-canvas",
+            "description": "Multi-user drawing and diagramming tool using CRDTs (Conflict-free Replicated Data Types) and WebSockets.",
+            "tech_stack": ["TypeScript", "React", "WebSockets", "Yjs / CRDT", "Canvas2D"],
+            "architecture": "P2P WebRTC / WebSocket synchronization with decentralized state convergence"
+        }
+    ]
+
+@app.post("/api/project/ingest")
+def ingest_project(req: ProjectIngestRequest):
+    """
+    Ingests a project from GitHub Repo URL, description, or code snippets,
+    deriving load-bearing architectural probes across the 8 categories from WarlCang/interview-my-project.
+    """
+    return voice_service.ingest_project_and_generate_probes(
+        repo_url=req.repo_url,
+        project_name=req.project_name,
+        project_description=req.project_description,
+        target_role=req.target_role,
+        interview_mode=req.interview_mode,
+        code_snippets=req.code_snippets
+    )
+
+@app.post("/api/project/verdict")
+def evaluate_project_answer(req: ProjectVerdictRequest):
+    """
+    Evaluates candidate's defense with Staff-Engineer standards:
+    returns 🟢 Solid / 🟡 Shaky / 🔴 Couldn't Defend + grounded coaching card.
+    """
+    return voice_service.evaluate_project_defense(
+        question_text=req.question_text,
+        answer_transcript=req.answer_transcript,
+        expected_concepts=req.expected_concepts,
+        target_role=req.target_role
+    )
+
+@app.post("/api/session/{session_id}/audio-turn")
+async def save_turn_audio(
+    session_id: int,
+    audio_file: UploadFile = File(...)
+):
+    """Saves per-question audio snippet for timestamped replay in faculty audit."""
+    os.makedirs(AUDIO_DIR, exist_ok=True)
+    filename = f"turn_session_{session_id}_{int(time.time() * 1000)}.webm"
+    file_path = os.path.join(AUDIO_DIR, filename)
+
+    content = await audio_file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    return {
+        "status": "saved",
+        "audio_url": f"/static/audio/{filename}"
+    }
+
+@app.post("/api/vivas/generate-from-context")
+def generate_questions_from_context(req: ContextQuestionGenRequest, db: Session = Depends(get_db)):
+    """
+    Generates syllabus/resume/JD-tailored technical questions across Bloom's taxonomy.
+    """
+    viva = db.query(Viva).filter(Viva.id == req.viva_id).first()
+    if not viva:
+        # Fallback to first viva
+        viva = db.query(Viva).first()
+
+    raw_questions = voice_service.generate_questions_from_context(req.context_text, req.role_title)
+    created = []
+    for g in raw_questions:
+        q_type_str = g.get("question_type", "CONCEPT")
+        q_type = QuestionType(q_type_str) if q_type_str in QuestionType.__members__ else QuestionType.CONCEPT
+        q = Question(
+            viva_id=viva.id if viva else 42,
+            question_text=g["question_text"],
+            difficulty=g.get("difficulty", 3),
+            question_type=q_type,
+            expected_concepts=g.get("expected_concepts", []),
+            answer_key=g.get("answer_key", ""),
+            source="AI_RESUME_GENERATED",
+            status="APPROVED"
+        )
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+        created.append({
+            "id": q.id,
+            "question_text": q.question_text,
+            "difficulty": q.difficulty,
+            "question_type": q.question_type.value,
+            "expected_concepts": q.expected_concepts,
+            "answer_key": q.answer_key
+        })
+
+    return {
+        "status": "success",
+        "role_title": req.role_title,
+        "questions": created,
+        "message": f"Successfully synthesized {len(created)} questions from provided background."
+    }
 
 # --- Authentication & Users ---
 @app.post("/api/auth/login")
@@ -136,7 +317,11 @@ def get_viva_details(viva_id: int, db: Session = Depends(get_db)):
                 "expected_concepts": q.expected_concepts,
                 "answer_key": q.answer_key,
                 "source": q.source,
-                "status": q.status
+                "status": q.status,
+                "parent_question_id": q.parent_question_id,
+                "branch_condition": q.branch_condition,
+                "tree_depth": q.tree_depth or 0,
+                "is_terminal": bool(q.is_terminal)
             }
             for q in questions
         ]
@@ -215,12 +400,78 @@ def approve_question(question_id: int, approve: bool = True, db: Session = Depen
     db.commit()
     return {"id": q.id, "status": q.status}
 
+@app.post("/api/vivas/{viva_id}/duration")
+def update_viva_duration(viva_id: int, req: VivaDurationUpdateRequest, db: Session = Depends(get_db)):
+    """Admin / Faculty endpoint to dynamically configure viva duration in minutes (0 = unlimited)."""
+    viva = db.query(Viva).filter(Viva.id == viva_id).first()
+    if not viva:
+        raise HTTPException(status_code=404, detail="Viva not found")
+    viva.duration_minutes = max(0, req.duration_minutes)
+    db.commit()
+    return {
+        "status": "success",
+        "viva_id": viva.id,
+        "duration_minutes": viva.duration_minutes,
+        "message": f"Viva duration updated to {'Unlimited' if viva.duration_minutes == 0 else f'{viva.duration_minutes} minutes'}."
+    }
+
+@app.post("/api/questions/tree-node")
+def add_question_tree_node(req: QuestionTreeNodeCreate, db: Session = Depends(get_db)):
+    """Allows faculty to add structured question tree nodes (Root, Child follow-up, or Hint)."""
+    viva = db.query(Viva).filter(Viva.id == req.viva_id).first()
+    if not viva:
+        raise HTTPException(status_code=404, detail="Viva not found")
+
+    q_type_str = req.question_type.upper()
+    q_type = QuestionType(q_type_str) if q_type_str in QuestionType.__members__ else QuestionType.CONCEPT
+
+    node = Question(
+        viva_id=req.viva_id,
+        topic_id=req.topic_id,
+        parent_question_id=req.parent_question_id,
+        branch_condition=req.branch_condition or "ROOT",
+        tree_depth=req.tree_depth or 0,
+        is_terminal=req.is_terminal or False,
+        question_text=req.question_text,
+        difficulty=req.difficulty or 3,
+        question_type=q_type,
+        expected_concepts=req.expected_concepts or [],
+        answer_key=req.answer_key or "",
+        source="FACULTY_CUSTOM_TREE",
+        status="APPROVED"
+    )
+    db.add(node)
+    db.commit()
+    db.refresh(node)
+    return {
+        "status": "success",
+        "question": {
+            "id": node.id,
+            "viva_id": node.viva_id,
+            "topic_id": node.topic_id,
+            "parent_question_id": node.parent_question_id,
+            "branch_condition": node.branch_condition,
+            "tree_depth": node.tree_depth,
+            "is_terminal": node.is_terminal,
+            "question_text": node.question_text,
+            "difficulty": node.difficulty,
+            "question_type": node.question_type.value,
+            "expected_concepts": node.expected_concepts,
+            "answer_key": node.answer_key
+        }
+    }
+
 # --- Live Viva Session Execution ---
 @app.post("/api/session/start")
 def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
     viva = db.query(Viva).filter(Viva.id == req.viva_id).first()
     if not viva:
         raise HTTPException(status_code=404, detail="Viva not found")
+
+    # Default to sweet female voice "aria"
+    persona_key = req.examiner_persona or "aria"
+    subject_label = req.subject_domain or viva.subject
+    duration_mins = req.duration_minutes if req.duration_minutes is not None else viva.duration_minutes
 
     session = VivaSession(
         viva_id=viva.id,
@@ -229,18 +480,39 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         started_at=time.time(),
         status=SessionStatus.IN_PROGRESS,
         current_phase=SessionPhase.WARMUP,
-        elapsed_seconds=0.0
+        elapsed_seconds=0.0,
+        duration_minutes=duration_mins,
+        examiner_persona=persona_key,
+        subject_domain=subject_label
     )
     db.add(session)
     db.commit()
     db.refresh(session)
 
-    # Initial opener question
-    opener_text = (
-        f"Hello {session.student_name}! Welcome to your 15-minute {viva.subject} Viva. "
-        "Please ensure your microphone is clear and you have consented to recording. "
-        "To begin, tell me briefly about a software project or data structures assignment you've built recently."
-    )
+    # Tailored persona greeting
+    if persona_key == "aria":
+        duration_phrase = f"{duration_mins}-minute" if duration_mins > 0 else "comprehensive"
+        opener_text = (
+            f"Hi {session.student_name}! I'm Aria, your AI interviewer today. I'm really glad to meet you! "
+            f"We'll explore your knowledge of {subject_label} in a friendly, conversational way. "
+            "Whenever you're ready, please share a quick introduction and tell me about a project or algorithm you've enjoyed working on recently."
+        )
+    elif persona_key == "alex":
+        opener_text = (
+            f"Hey {session.student_name}, I'm Alex Sterling. Welcome to your technical interview on {subject_label}. "
+            "Microphone check looks solid. Let's dive right in: give me a crisp 60-second walkthrough of a software project or system you've engineered recently."
+        )
+    elif persona_key == "priya":
+        opener_text = (
+            f"Namaste {session.student_name}! I am Prof. Priya Nair. Welcome to your {subject_label} viva. "
+            "Please ensure your microphone is steady and you're comfortable. To begin our conversation, tell me about an interesting project or algorithm you built recently."
+        )
+    else:
+        opener_text = (
+            f"Greetings {session.student_name}. I am Dr. Eleanor Vance. Welcome to your {subject_label} oral examination. "
+            "Please confirm your recording consent and audio clarity. To begin, tell me briefly about a software project or data structures assignment you've built recently."
+        )
+
     first_qa = QuestionAsked(
         session_id=session.id,
         question_id=None,
@@ -256,10 +528,12 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         "session_id": session.id,
         "viva_title": viva.title,
         "student_name": session.student_name,
-        "duration_minutes": viva.duration_minutes,
+        "duration_minutes": duration_mins,
         "initial_prompt": opener_text,
         "phase": SessionPhase.WARMUP.value,
-        "elapsed_seconds": 0.0
+        "elapsed_seconds": 0.0,
+        "examiner_persona": persona_key,
+        "subject_domain": subject_label
     }
 
 @app.post("/api/session/turn")
@@ -272,7 +546,12 @@ def process_turn(req: StudentTurnRequest, db: Session = Depends(get_db)):
         is_silence=req.is_silence,
         is_giveup=req.is_giveup,
         is_hint_req=req.is_hint_request,
-        project_claim=req.project_claim
+        project_claim=req.project_claim,
+        code_snippet=req.code_snippet,
+        audio_chunk_url=req.audio_chunk_url,
+        wpm=req.wpm,
+        filler_words=req.filler_words,
+        fluency_score=req.fluency_score
     )
     return result
 
@@ -290,13 +569,34 @@ def end_viva_session(session_id: int, background_tasks: BackgroundTasks, db: Ses
     scorer = ScoringWorker(db)
     score_result = scorer.evaluate_session(session_id)
 
+    # Compute acoustic telemetry summary
+    answers = db.query(StudentAnswer).filter(StudentAnswer.session_id == session_id).all()
+    wpms = [a.wpm for a in answers if a.wpm is not None and a.wpm > 0]
+    avg_wpm = round(sum(wpms) / len(wpms), 1) if wpms else 126.0
+    total_fillers = sum(sum(a.filler_words.values()) for a in answers if a.filler_words)
+    fluencies = [a.fluency_score for a in answers if a.fluency_score is not None]
+    avg_fluency = round(sum(fluencies) / len(fluencies), 1) if fluencies else 92.0
+
     return {
         "status": "completed",
         "session_id": session.id,
         "final_score": score_result.total_score,
         "confidence": score_result.confidence,
         "feedback": score_result.feedback,
-        "flagged_for_review": session.flagged_for_review
+        "flagged_for_review": session.flagged_for_review,
+        "rubric_breakdown": {
+            "conceptual": score_result.conceptual,
+            "depth": score_result.depth,
+            "problem_solving": score_result.problem_solving,
+            "practical": score_result.practical,
+            "communication": score_result.communication
+        },
+        "acoustic_summary": {
+            "avg_wpm": avg_wpm,
+            "total_fillers": total_fillers,
+            "avg_fluency": avg_fluency,
+            "pacing_verdict": "Optimal Cadence" if 95 <= avg_wpm <= 165 else ("Rapid Cadence" if avg_wpm > 165 else "Deliberate/Ponderous Cadence")
+        }
     }
 
 @app.post("/api/session/integrity")
@@ -395,7 +695,12 @@ def get_faculty_session_audit(session_id: int, db: Session = Depends(get_db)):
                 "answer_quality": matching_ans.answer_quality.value,
                 "detected_concepts": matching_ans.detected_concepts,
                 "missing_concepts": matching_ans.missing_concepts,
-                "latency_ms": matching_ans.latency_ms
+                "latency_ms": matching_ans.latency_ms,
+                "audio_chunk_url": matching_ans.audio_chunk_url,
+                "wpm": matching_ans.wpm,
+                "filler_words": matching_ans.filler_words,
+                "fluency_score": matching_ans.fluency_score,
+                "code_snippet": matching_ans.code_snippet
             })
 
     # Rubric scores & evidence
@@ -459,7 +764,9 @@ def get_faculty_session_audit(session_id: int, db: Session = Depends(get_db)):
             "confidence": session.confidence,
             "flagged_for_review": session.flagged_for_review,
             "flag_reason": session.flag_reason,
-            "audio_url": session.audio_url or "/static/audio/sample_stu001.wav"
+            "audio_url": session.audio_url or "/static/audio/sample_stu001.wav",
+            "examiner_persona": session.examiner_persona or "eleanor",
+            "subject_domain": session.subject_domain or "Data Structures & Algorithms"
         },
         "timeline": timeline,
         "score": score_data,

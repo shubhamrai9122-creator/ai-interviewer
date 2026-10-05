@@ -41,19 +41,33 @@ class VivaEngine:
     def __init__(self, db: Session):
         self.db = db
 
-    def calculate_phase(self, elapsed_sec: float) -> SessionPhase:
-        """Determines the viva phase deterministically based on elapsed time."""
-        if elapsed_sec < 60:        # 0:00 - 1:00
+    def calculate_phase(self, elapsed_sec: float, duration_minutes: int = 15, questions_asked_count: int = 0) -> SessionPhase:
+        """Determines the viva phase based on configured duration or question count (unlimited)."""
+        if duration_minutes <= 0:
+            # Unlimited / Open-ended mode: phase tracks progression across question tree
+            if questions_asked_count <= 1:
+                return SessionPhase.WARMUP
+            elif questions_asked_count <= 4:
+                return SessionPhase.FUNDAMENTALS
+            elif questions_asked_count <= 8:
+                return SessionPhase.DEPTH
+            else:
+                return SessionPhase.APPLIED
+
+        total_sec = duration_minutes * 60.0
+        frac = elapsed_sec / max(1.0, total_sec)
+
+        if frac < (60.0 / 900.0):
             return SessionPhase.WARMUP
-        elif elapsed_sec < 300:     # 1:00 - 5:00
+        elif frac < (300.0 / 900.0):
             return SessionPhase.FUNDAMENTALS
-        elif elapsed_sec < 600:     # 5:00 - 10:00
+        elif frac < (600.0 / 900.0):
             return SessionPhase.DEPTH
-        elif elapsed_sec < 780:     # 10:00 - 13:00
+        elif frac < (780.0 / 900.0):
             return SessionPhase.APPLIED
-        elif elapsed_sec < 870:     # 13:00 - 14:30
+        elif frac < (880.0 / 900.0):
             return SessionPhase.WRAPUP
-        elif elapsed_sec < 900:     # 14:30 - 15:00
+        elif frac < 1.00:
             return SessionPhase.SCORING
         else:
             return SessionPhase.COMPLETED
@@ -147,20 +161,23 @@ class VivaEngine:
         missing_concepts: List[str]
     ) -> Tuple[str, Optional[int], QuestionType]:
         """
-        Adaptive Question Selector based on Phase, Question Bank, and Knowledge State.
+        Adaptive Topic Question Tree Traversal Engine:
+        - Starts at the Topic Root question
+        - Explores child branches (Correct/Strong vs Socratic Hint)
+        - Stops when branch hits terminal leaf, and smoothly transitions to next topic tree
         """
         # 1. Warm-up Phase
         if current_phase == SessionPhase.WARMUP:
             q_count = len(session.questions_asked)
             if q_count == 0:
                 return (
-                    f"Hello {session.student_name}! Welcome to your 15-minute MSOT Technical Viva. Please confirm your audio is working clearly, and tell me briefly about a software project or data structures assignment you've built recently.",
+                    f"Hello {session.student_name}! I'm Aria, your AI interviewer today. Welcome to your {session.subject_domain or 'technical viva'}! Please take a gentle breath and make sure you're comfortable. To begin our conversation warmly, could you tell me a little bit about a software project or coding assignment you built recently?",
                     None,
                     QuestionType.PROJECT
                 )
             else:
                 return (
-                    "Thank you. That's a great project to hear about. Now let's begin the technical core round. Are you ready?",
+                    "Thank you so much! That sounds really interesting and well-crafted. Now let's dive into our first topic question tree. Are you ready?",
                     None,
                     QuestionType.CONCEPT
                 )
@@ -168,91 +185,97 @@ class VivaEngine:
         # 2. Wrap-up Phase
         if current_phase == SessionPhase.WRAPUP:
             return (
-                "We are reaching the 15-minute mark. You've done well tackling these questions. Is there any final technical clarification or point you would like to briefly add before we conclude?",
+                "You've done wonderfully tackling these questions! We have covered all our main technical areas today. Is there any final clarification, detail, or insight you would like to share before we conclude?",
                 None,
                 QuestionType.CONCEPT
             )
 
         if current_phase in [SessionPhase.SCORING, SessionPhase.COMPLETED]:
             return (
-                "Your 15-minute viva has now concluded. The session audio and timestamped transcript have been saved for faculty audit. Your final rubric evaluation will be processed immediately. You may now disconnect.",
+                "Our viva examination has now concluded! All your spoken explanations and code have been saved for faculty review. Your evaluation report is being generated right now. Thank you so much for your effort!",
                 None,
                 QuestionType.CONCEPT
             )
 
         # Get all asked question IDs in this session
         asked_ids = [qa.question_id for qa in session.questions_asked if qa.question_id is not None]
+        last_qa = session.questions_asked[-1] if session.questions_asked else None
+        last_q_id = last_qa.question_id if last_qa else None
 
         # 3. Handle Hint / Missing Concept Follow-up
         if last_action == FollowupAction.HINT and missing_concepts:
             target_concept = missing_concepts[0]
+            # Check if there is an explicit hint branch question in the tree
+            if last_q_id:
+                hint_child = self.db.query(Question).filter(
+                    Question.parent_question_id == last_q_id,
+                    Question.branch_condition == "PARTIAL",
+                    ~Question.id.in_(asked_ids)
+                ).first()
+                if hint_child:
+                    return (hint_child.question_text, hint_child.id, hint_child.question_type)
+
             return (
-                f"You're on the right track, but think carefully about {target_concept}. How does {target_concept} factor into this approach? Take a moment to consider.",
+                f"You're very close! Think a little more about {target_concept}. How would that play a role here? Take your time.",
                 None,
                 QuestionType.WHY
             )
 
         if last_action == FollowupAction.REDIRECT:
             return (
-                "Let's refocus strictly on our core technical objective. In the context of this data structure, how does your implementation handle scale and edge cases?",
+                "Let's refocus gently on our core technical objective. In the context of this data structure, how does your implementation handle scale and edge cases?",
                 None,
                 QuestionType.WHY
             )
 
-        # 4. Handle Strong Answer -> Deepen (Bloom's Level 4 / 5)
-        if last_quality == AnswerQuality.STRONG:
-            # Look for an approved WHY or EDGE_CASE question in the bank
-            deep_q = self.db.query(Question).filter(
-                Question.viva_id == session.viva_id,
-                Question.question_type.in_([QuestionType.WHY, QuestionType.EDGE_CASE, QuestionType.TRADE_OFF]),
+        # 4. Tree Traversal: Check if last question has child branch nodes in the tree
+        if last_q_id:
+            last_q = self.db.query(Question).filter(Question.id == last_q_id).first()
+            if last_q and not last_q.is_terminal:
+                branch_filter = ["STRONG", "CORRECT"] if last_quality == AnswerQuality.STRONG else ["CORRECT", "STRONG"]
+                child_q = self.db.query(Question).filter(
+                    Question.parent_question_id == last_q_id,
+                    Question.branch_condition.in_(branch_filter),
+                    ~Question.id.in_(asked_ids)
+                ).order_by(Question.tree_depth.asc()).first()
+
+                if child_q:
+                    prefix = "That was a wonderfully clear explanation! Let's branch deeper into this topic: " if last_quality == AnswerQuality.STRONG else "Good. Following up on this branch: "
+                    return (f"{prefix}{child_q.question_text}", child_q.id, child_q.question_type)
+
+        # 5. If branch ended (terminal leaf reached) or no child: Transition to NEXT Topic Tree!
+        topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).order_by(Topic.id.asc()).all()
+        for t in topics:
+            root_q = self.db.query(Question).filter(
+                Question.topic_id == t.id,
+                Question.tree_depth == 1,
                 ~Question.id.in_(asked_ids)
             ).first()
 
-            if deep_q:
-                return (f"Excellent explanation. Let's go one level deeper: {deep_q.question_text}", deep_q.id, deep_q.question_type)
-            else:
+            if root_q:
+                session.current_topic_id = t.id
                 return (
-                    "That was very well explained. Now, what trade-offs would you face if the input dataset became 100 times larger than available RAM?",
-                    None,
-                    QuestionType.TRADE_OFF
+                    f"Great job! That successfully completes our exploration of that topic tree. Let's now branch into our next topic: {t.name}. {root_q.question_text}",
+                    root_q.id,
+                    root_q.question_type
                 )
 
-        # 5. Phase-Specific Question Selection from Bank
-        if current_phase == SessionPhase.FUNDAMENTALS:
-            q = self.db.query(Question).filter(
-                Question.viva_id == session.viva_id,
-                Question.question_type == QuestionType.CONCEPT,
-                ~Question.id.in_(asked_ids)
-            ).order_by(Question.difficulty.asc()).first()
+        # 6. If all trees exhausted, check any remaining unasked approved questions
+        remaining_q = self.db.query(Question).filter(
+            Question.viva_id == session.viva_id,
+            Question.status == "APPROVED",
+            ~Question.id.in_(asked_ids)
+        ).first()
 
-            if q:
-                return (q.question_text, q.id, q.question_type)
-            return ("Can you explain how a Hash Map handles collision resolution under high load factor?", None, QuestionType.CONCEPT)
+        if remaining_q:
+            return (remaining_q.question_text, remaining_q.id, remaining_q.question_type)
 
-        elif current_phase == SessionPhase.DEPTH:
-            q = self.db.query(Question).filter(
-                Question.viva_id == session.viva_id,
-                Question.question_type.in_([QuestionType.WHY, QuestionType.EDGE_CASE, QuestionType.TRADE_OFF]),
-                ~Question.id.in_(asked_ids)
-            ).order_by(Question.difficulty.desc()).first()
-
-            if q:
-                return (f"Probing deeper on this topic: {q.question_text}", q.id, q.question_type)
-            return ("Consider an unbalanced Binary Search Tree that degenerates into a linked list. How would an AVL or Red-Black Tree guarantee logarithmic bounds?", None, QuestionType.EDGE_CASE)
-
-        elif current_phase == SessionPhase.APPLIED:
-            q = self.db.query(Question).filter(
-                Question.viva_id == session.viva_id,
-                Question.question_type.in_([QuestionType.APPLIED, QuestionType.DEBUGGING]),
-                ~Question.id.in_(asked_ids)
-            ).first()
-
-            if q:
-                return (f"Here is an applied engineering scenario: {q.question_text}", q.id, q.question_type)
-            return ("Suppose your production caching layer experiences sudden cache stampede when popular keys expire. How would you debug and architect a solution?", None, QuestionType.APPLIED)
-
-        # Fallback
-        return ("Could you elaborate on the time and space complexity trade-offs in your design?", None, QuestionType.TRADE_OFF)
+        # All question trees completed!
+        return (
+            "You have covered all the topic question trees prepared for this examination! Is there any final technical clarification or insight you'd like to share before we conclude?",
+            None,
+            QuestionType.CONCEPT
+        )
 
     def process_turn(
         self,
@@ -262,10 +285,16 @@ class VivaEngine:
         is_silence: bool = False,
         is_giveup: bool = False,
         is_hint_req: bool = False,
-        project_claim: Optional[str] = None
+        project_claim: Optional[str] = None,
+        code_snippet: Optional[str] = None,
+        audio_chunk_url: Optional[str] = None,
+        wpm: Optional[float] = None,
+        filler_words: Optional[Dict[str, int]] = None,
+        fluency_score: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Executes an end-to-end viva conversational turn with latency profiling.
+        Executes an end-to-end viva conversational turn with latency profiling,
+        recording acoustic telemetry, code submissions, and audio clips.
         """
         start_time = time.time()
         session = self.db.query(VivaSession).filter(VivaSession.id == session_id).first()
@@ -273,16 +302,22 @@ class VivaEngine:
             raise ValueError(f"Session {session_id} not found")
 
         # Update session elapsed time and calculate phase
-        session.elapsed_seconds = elapsed_seconds
-        new_phase = self.calculate_phase(elapsed_seconds)
+        duration_mins = session.duration_minutes if session.duration_minutes is not None else 15
+        questions_count = len(session.questions_asked)
+        new_phase = self.calculate_phase(elapsed_seconds, duration_minutes=duration_mins, questions_asked_count=questions_count)
         session.current_phase = new_phase
 
+        # Combine student transcript and code for analysis if code was submitted
+        combined_text = student_transcript
+        if code_snippet and code_snippet.strip():
+            combined_text += f"\n[Code Implementation]: {code_snippet}"
+
         # Check prompt injection
-        if self.detect_prompt_injection(student_transcript):
+        if self.detect_prompt_injection(combined_text):
             integ = IntegrityLog(
                 session_id=session.id,
                 event_type="PROMPT_INJECTION_ATTEMPT",
-                details=f"Candidate uttered injection: '{student_transcript[:120]}...'",
+                details=f"Candidate uttered injection: '{combined_text[:120]}...'",
                 timestamp_sec=elapsed_seconds
             )
             self.db.add(integ)
@@ -301,7 +336,7 @@ class VivaEngine:
         # Analyze student answer
         quality, action, detected, missing = self.analyze_answer(
             question=last_bank_q,
-            raw_transcript=student_transcript,
+            raw_transcript=combined_text,
             is_giveup=is_giveup,
             is_silence=is_silence,
             is_hint_req=is_hint_req
@@ -319,7 +354,12 @@ class VivaEngine:
                 followup_action=action,
                 detected_concepts=detected,
                 missing_concepts=missing,
-                latency_ms=(time.time() - start_time) * 1000
+                latency_ms=(time.time() - start_time) * 1000,
+                audio_chunk_url=audio_chunk_url,
+                wpm=wpm,
+                filler_words=filler_words or {},
+                fluency_score=fluency_score,
+                code_snippet=code_snippet
             )
             self.db.add(answer)
 
@@ -347,11 +387,15 @@ class VivaEngine:
 
         latency_ms = round((time.time() - start_time) * 1000, 1)
 
+        total_sec = duration_mins * 60 if duration_mins > 0 else 0
+        rem_sec = max(0, total_sec - elapsed_seconds) if duration_mins > 0 else 0
+
         return {
             "session_id": session.id,
             "current_phase": new_phase.value,
             "elapsed_seconds": elapsed_seconds,
-            "remaining_seconds": max(0, 900 - elapsed_seconds),
+            "duration_minutes": duration_mins,
+            "remaining_seconds": rem_sec,
             "ai_response_text": next_text,
             "question_type": next_qtype.value,
             "answer_quality": quality.value,

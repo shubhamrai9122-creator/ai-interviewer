@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, CheckCircle, AlertTriangle, Play, Pause, RotateCcw, 
-  Award, ShieldAlert, FileText, Check, X, Download, Sliders, Sparkles, MessageSquare
+  Award, ShieldAlert, FileText, Check, X, Download, Sliders, Sparkles, MessageSquare,
+  Volume2, Code2, GitBranch, Clock, PlusCircle, CornerDownRight
 } from 'lucide-react';
+import ResumeQuestionGeneratorModal from './ResumeQuestionGeneratorModal';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -12,17 +14,39 @@ export default function FacultyDashboard() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [auditData, setAuditData] = useState(null);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
 
   // Faculty Override form
   const [newScore, setNewScore] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
   const [overrideSuccess, setOverrideSuccess] = useState(false);
 
-  // Question bank tab
+  // Question bank & tree tab
   const [activeSubTab, setActiveSubTab] = useState('sessions'); // 'sessions', 'bank', 'calibration'
   const [vivaDetails, setVivaDetails] = useState(null);
   const [generatingAiQ, setGeneratingAiQ] = useState(false);
   const [calibrationData, setCalibrationData] = useState(null);
+
+  // Exam Duration state (Admin/Faculty configured)
+  const [selectedDuration, setSelectedDuration] = useState(15);
+  const [durationSaving, setDurationSaving] = useState(false);
+  const [durationMessage, setDurationMessage] = useState('');
+
+  // Add Tree Node modal state
+  const [isAddNodeOpen, setIsAddNodeOpen] = useState(false);
+  const [nodeForm, setNodeForm] = useState({
+    topic_id: 1,
+    parent_question_id: null,
+    branch_condition: 'ROOT',
+    tree_depth: 0,
+    is_terminal: false,
+    question_text: '',
+    difficulty: 3,
+    question_type: 'CONCEPT',
+    expected_concepts: '',
+    answer_key: ''
+  });
+  const [addingNode, setAddingNode] = useState(false);
 
   // Audio player ref
   const audioRef = useRef(null);
@@ -46,8 +70,91 @@ export default function FacultyDashboard() {
       const res = await fetch(`${API_BASE}/api/vivas/42`);
       const data = await res.json();
       setVivaDetails(data);
+      if (data && data.duration_minutes !== undefined) {
+        setSelectedDuration(data.duration_minutes);
+      }
     } catch (err) {
       console.error('Failed to load viva details:', err);
+    }
+  };
+
+  // Update Exam Duration
+  const handleUpdateDuration = async (minutes) => {
+    setDurationSaving(true);
+    setDurationMessage('');
+    try {
+      const res = await fetch(`${API_BASE}/api/vivas/42/duration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration_minutes: minutes })
+      });
+      const data = await res.json();
+      setSelectedDuration(minutes);
+      setDurationMessage(data.message || `Exam duration set to ${minutes === 0 ? 'Unlimited' : `${minutes}m`}`);
+      loadVivaDetails();
+    } catch (err) {
+      alert('Failed to update duration: ' + err.message);
+    } finally {
+      setDurationSaving(false);
+    }
+  };
+
+  // Add question tree node in advance
+  const handleCreateTreeNode = async (e) => {
+    e.preventDefault();
+    if (!nodeForm.question_text.trim()) {
+      alert('Question text is required.');
+      return;
+    }
+    setAddingNode(true);
+    try {
+      const concepts = nodeForm.expected_concepts
+        .split(',')
+        .map(c => c.trim())
+        .filter(Boolean);
+
+      const payload = {
+        viva_id: 42,
+        topic_id: parseInt(nodeForm.topic_id),
+        parent_question_id: nodeForm.parent_question_id ? parseInt(nodeForm.parent_question_id) : null,
+        branch_condition: nodeForm.branch_condition,
+        tree_depth: parseInt(nodeForm.tree_depth),
+        is_terminal: Boolean(nodeForm.is_terminal),
+        question_text: nodeForm.question_text.trim(),
+        difficulty: parseInt(nodeForm.difficulty),
+        question_type: nodeForm.question_type,
+        expected_concepts: concepts,
+        answer_key: nodeForm.answer_key.trim()
+      };
+
+      const res = await fetch(`${API_BASE}/api/questions/tree-node`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setIsAddNodeOpen(false);
+        setNodeForm({
+          topic_id: 1,
+          parent_question_id: null,
+          branch_condition: 'ROOT',
+          tree_depth: 0,
+          is_terminal: false,
+          question_text: '',
+          difficulty: 3,
+          question_type: 'CONCEPT',
+          expected_concepts: '',
+          answer_key: ''
+        });
+        loadVivaDetails();
+      } else {
+        const errData = await res.json();
+        alert('Failed to add question node: ' + (errData.detail || 'Error'));
+      }
+    } catch (err) {
+      alert('Error creating question node: ' + err.message);
+    } finally {
+      setAddingNode(false);
     }
   };
 
@@ -210,6 +317,68 @@ export default function FacultyDashboard() {
             <div className="mono" style={{ fontSize: '24px', fontWeight: '800', color: 'var(--amber)' }}>1.6s</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Target &lt;2.5s Passed</div>
           </div>
+        </div>
+      </div>
+
+      {/* Faculty / Admin Controls: Exam Duration & Policy */}
+      <div className="glass-panel" style={{
+        padding: '16px 24px',
+        marginBottom: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '16px',
+        background: 'rgba(99, 102, 241, 0.06)',
+        border: '1px solid rgba(99, 102, 241, 0.2)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: 'rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Clock size={20} color="var(--primary-light)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>
+              Faculty / Admin Exam Duration Control
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Configure viva duration for the cohort or choose <strong>Unlimited Mode</strong> so AI asks as many questions as needed across topic trees.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {[
+            { label: '5 Min', value: 5 },
+            { label: '10 Min', value: 10 },
+            { label: '15 Min', value: 15 },
+            { label: '30 Min', value: 30 },
+            { label: '45 Min', value: 45 },
+            { label: '60 Min', value: 60 },
+            { label: '♾️ Unlimited', value: 0 }
+          ].map(opt => (
+            <button
+              key={opt.value}
+              disabled={durationSaving}
+              onClick={() => handleUpdateDuration(opt.value)}
+              className={`btn ${selectedDuration === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontWeight: selectedDuration === opt.value ? '700' : '500'
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {durationMessage && (
+            <span style={{ fontSize: '12px', color: 'var(--emerald)', marginLeft: '8px' }}>
+              ✓ {durationMessage}
+            </span>
+          )}
         </div>
       </div>
 
@@ -435,18 +604,57 @@ export default function FacultyDashboard() {
                         <span style={{ fontSize: '12px', fontWeight: '700', color: item.speaker === 'AI Examiner' ? 'var(--primary-light)' : 'var(--cyan)' }}>
                           {item.speaker}
                         </span>
-                        <button
-                          onClick={() => seekTo(item.timestamp_sec)}
-                          className="mono"
-                          style={{
-                            background: 'transparent', border: 'none', color: 'var(--cyan)',
-                            cursor: 'pointer', fontSize: '11px', textDecoration: 'underline'
-                          }}
-                        >
-                          [{formatSec(item.timestamp_sec)}]
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.audio_chunk_url && (
+                            <button
+                              onClick={() => {
+                                const a = new Audio(API_BASE + item.audio_chunk_url);
+                                a.play();
+                              }}
+                              className="btn btn-secondary mono"
+                              style={{ fontSize: '10px', padding: '2px 6px', height: '22px' }}
+                              title="Play isolated student audio snippet"
+                            >
+                              <Volume2 size={11} color="var(--emerald)" />
+                              Play Spoken Clip
+                            </button>
+                          )}
+                          <button
+                            onClick={() => seekTo(item.timestamp_sec)}
+                            className="mono"
+                            style={{
+                              background: 'transparent', border: 'none', color: 'var(--cyan)',
+                              cursor: 'pointer', fontSize: '11px', textDecoration: 'underline'
+                            }}
+                          >
+                            [{formatSec(item.timestamp_sec)}]
+                          </button>
+                        </div>
                       </div>
                       <p style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: '1.4' }}>{item.text}</p>
+                      {item.code_snippet && (
+                        <div style={{
+                          marginTop: '6px',
+                          background: 'rgba(0, 0, 0, 0.5)',
+                          padding: '8px',
+                          borderRadius: '6px',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '11px',
+                          color: '#38bdf8',
+                          overflowX: 'auto',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>Student Submitted Code:</div>
+                          {item.code_snippet}
+                        </div>
+                      )}
+                      {item.wpm && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '10px', color: 'var(--text-dim)' }}>
+                          <span>⚡ {item.wpm} WPM</span>
+                          <span>• Fillers: {Object.values(item.filler_words || {}).reduce((a, b) => a + b, 0)}</span>
+                          <span>• Fluency: {item.fluency_score}%</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -515,82 +723,238 @@ export default function FacultyDashboard() {
         </div>
       )}
 
-      {/* SUBTAB 2: Question Bank Manager */}
+      {/* SUBTAB 2: Question Bank Manager & Topic Tree Structure */}
       {activeSubTab === 'bank' && vivaDetails && (
         <div className="glass-panel" style={{ padding: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Approved Question Bank</h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                {vivaDetails.subject} | {vivaDetails.questions.length} Questions Cataloged
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitBranch size={22} color="var(--primary-light)" />
+                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>Faculty Topic Question Trees</h3>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {vivaDetails.subject} • Faculty provides advance questions structured as branching decision trees (Root ➔ Deep Probe / Hint ➔ Terminal Stop).
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  setNodeForm({
+                    topic_id: vivaDetails.topics?.[0]?.id || 1,
+                    parent_question_id: null,
+                    branch_condition: 'ROOT',
+                    tree_depth: 0,
+                    is_terminal: false,
+                    question_text: '',
+                    difficulty: 3,
+                    question_type: 'CONCEPT',
+                    expected_concepts: '',
+                    answer_key: ''
+                  });
+                  setIsAddNodeOpen(true);
+                }}
+                className="btn btn-primary"
+                style={{ fontSize: '13px', background: 'linear-gradient(135deg, #10b981, #06b6d4)' }}
+              >
+                <PlusCircle size={15} />
+                Add Advance Tree Node
+              </button>
+
+              <button
+                onClick={() => setIsResumeModalOpen(true)}
+                className="btn btn-secondary"
+                style={{ fontSize: '13px' }}
+              >
+                <FileText size={15} color="var(--cyan)" />
+                Resume / JD Synthesizer
+              </button>
+
               <button
                 onClick={handleGenerateQuestions}
                 disabled={generatingAiQ}
-                className="btn btn-primary"
+                className="btn btn-secondary"
                 style={{ fontSize: '13px' }}
               >
-                <Sparkles size={16} />
-                {generatingAiQ ? 'Generating...' : 'AI Generate Questions for Approval'}
+                <Sparkles size={15} />
+                {generatingAiQ ? 'Generating...' : 'AI Generate Nodes'}
               </button>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {vivaDetails.questions.map(q => (
-              <div
-                key={q.id}
-                style={{
-                  background: 'rgba(11, 17, 32, 0.6)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '16px 20px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div style={{ maxWidth: '80%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span className="badge badge-purple">{q.question_type}</span>
-                    <span className="badge badge-blue">Diff: {q.difficulty}/5</span>
-                    <span className={`badge ${q.status === 'APPROVED' ? 'badge-emerald' : 'badge-amber'}`}>
-                      {q.status}
-                    </span>
-                    <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      Source: {q.source}
-                    </span>
-                  </div>
-                  <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '6px' }}>
-                    {q.question_text}
-                  </h4>
-                  <div style={{ fontSize: '12px', color: 'var(--cyan)' }}>
-                    Expected Concepts: {q.expected_concepts?.join(', ') || 'N/A'}
-                  </div>
-                </div>
+          {/* Render Topics with Trees */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {(vivaDetails.topics || []).map(topic => {
+              const topicQuestions = (vivaDetails.questions || []).filter(q => q.topic_id === topic.id);
+              const rootQuestions = topicQuestions.filter(q => !q.parent_question_id || q.branch_condition === 'ROOT');
 
-                {q.status === 'PENDING' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => handleApproveQuestion(q.id, true)}
-                      className="btn btn-success"
-                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                    >
-                      <Check size={14} /> Approve
-                    </button>
-                    <button
-                      onClick={() => handleApproveQuestion(q.id, false)}
-                      className="btn btn-danger"
-                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                    >
-                      <X size={14} /> Reject
-                    </button>
+              return (
+                <div
+                  key={topic.id}
+                  style={{
+                    background: 'rgba(11, 17, 32, 0.7)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '20px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="badge badge-purple" style={{ fontSize: '12px' }}>Topic {topic.id}</span>
+                      <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#fff', margin: 0 }}>{topic.name}</h4>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="badge badge-blue">Weight: {Math.round(topic.weight * 100)}%</span>
+                      <span className="mono" style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                        {topicQuestions.length} Questions in Tree
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {rootQuestions.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No root questions configured for this topic yet. Click "Add Advance Tree Node" to create one.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {rootQuestions.map(rootQ => {
+                        const childNodes = topicQuestions.filter(c => c.parent_question_id === rootQ.id);
+
+                        return (
+                          <div
+                            key={rootQ.id}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid rgba(99, 102, 241, 0.25)',
+                              borderRadius: 'var(--radius-md)',
+                              padding: '16px'
+                            }}
+                          >
+                            {/* Root Node Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                  <span className="badge badge-blue">🌲 ROOT (Depth 0)</span>
+                                  <span className="badge badge-purple">{rootQ.question_type}</span>
+                                  <span className="badge badge-cyan">Diff: {rootQ.difficulty}/5</span>
+                                  <span className={`badge ${rootQ.status === 'APPROVED' ? 'badge-emerald' : 'badge-amber'}`}>
+                                    {rootQ.status}
+                                  </span>
+                                </div>
+                                <h4 style={{ fontSize: '15px', fontWeight: '600', color: '#fff', margin: '4px 0 6px 0' }}>
+                                  {rootQ.question_text}
+                                </h4>
+                                <div style={{ fontSize: '12px', color: 'var(--cyan)' }}>
+                                  Expected Concepts: {rootQ.expected_concepts?.join(', ') || 'N/A'}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setNodeForm({
+                                    topic_id: topic.id,
+                                    parent_question_id: rootQ.id,
+                                    branch_condition: 'CORRECT',
+                                    tree_depth: 1,
+                                    is_terminal: false,
+                                    question_text: '',
+                                    difficulty: Math.min(5, rootQ.difficulty + 1),
+                                    question_type: 'WHY',
+                                    expected_concepts: '',
+                                    answer_key: ''
+                                  });
+                                  setIsAddNodeOpen(true);
+                                }}
+                                className="btn btn-secondary"
+                                style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                              >
+                                + Add Branch
+                              </button>
+                            </div>
+
+                            {/* Child Branches */}
+                            {childNodes.length > 0 && (
+                              <div style={{ marginTop: '14px', paddingLeft: '16px', borderLeft: '2px dashed rgba(99, 102, 241, 0.4)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {childNodes.map(childQ => {
+                                  const grandChildren = topicQuestions.filter(gc => gc.parent_question_id === childQ.id);
+
+                                  return (
+                                    <div key={childQ.id} style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '8px', padding: '12px 14px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                            <CornerDownRight size={14} color="var(--primary-light)" />
+                                            <span className={`badge ${childQ.branch_condition === 'PARTIAL' ? 'badge-amber' : 'badge-emerald'}`}>
+                                              Branch: IF {childQ.branch_condition}
+                                            </span>
+                                            <span className="badge badge-purple">{childQ.question_type}</span>
+                                            {childQ.is_terminal && (
+                                              <span className="badge badge-rose">🛑 Terminal Leaf (Topic Concludes)</span>
+                                            )}
+                                          </div>
+                                          <div style={{ fontSize: '13.5px', fontWeight: '500', color: '#e2e8f0', margin: '4px 0' }}>
+                                            {childQ.question_text}
+                                          </div>
+                                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                            Concepts: {childQ.expected_concepts?.join(', ')}
+                                          </div>
+                                        </div>
+
+                                        {!childQ.is_terminal && (
+                                          <button
+                                            onClick={() => {
+                                              setNodeForm({
+                                                topic_id: topic.id,
+                                                parent_question_id: childQ.id,
+                                                branch_condition: 'STRONG',
+                                                tree_depth: 2,
+                                                is_terminal: true,
+                                                question_text: '',
+                                                difficulty: 4,
+                                                question_type: 'APPLIED',
+                                                expected_concepts: '',
+                                                answer_key: ''
+                                              });
+                                              setIsAddNodeOpen(true);
+                                            }}
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '10px', padding: '3px 8px', whiteSpace: 'nowrap' }}
+                                          >
+                                            + Add Follow-up
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {/* Grandchildren / Depth 2 Nodes */}
+                                      {grandChildren.length > 0 && (
+                                        <div style={{ marginTop: '10px', paddingLeft: '14px', borderLeft: '2px dotted rgba(6, 182, 212, 0.4)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          {grandChildren.map(gc => (
+                                            <div key={gc.id} style={{ background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', padding: '10px' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                                                <CornerDownRight size={12} color="var(--cyan)" />
+                                                <span className="badge badge-cyan">Depth 2: IF {gc.branch_condition}</span>
+                                                {gc.is_terminal && (
+                                                  <span className="badge badge-rose">🛑 Terminal Stop Node</span>
+                                                )}
+                                              </div>
+                                              <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                                                {gc.question_text}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -652,6 +1016,218 @@ export default function FacultyDashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal: Add Advance Tree Node (Root, Branch, or Terminal Hint) */}
+      {isAddNodeOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '640px',
+            width: '100%',
+            padding: '28px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <GitBranch size={20} color="var(--primary-light)" />
+                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Add Advance Question to Topic Tree</h3>
+              </div>
+              <button
+                onClick={() => setIsAddNodeOpen(false)}
+                className="btn btn-secondary"
+                style={{ padding: '4px', borderRadius: '50%', width: '28px', height: '28px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTreeNode} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Select Topic
+                  </label>
+                  <select
+                    className="input-field"
+                    value={nodeForm.topic_id}
+                    onChange={e => setNodeForm({ ...nodeForm, topic_id: parseInt(e.target.value) })}
+                  >
+                    {(vivaDetails?.topics || []).map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Branch Trigger Condition
+                  </label>
+                  <select
+                    className="input-field"
+                    value={nodeForm.branch_condition}
+                    onChange={e => setNodeForm({ ...nodeForm, branch_condition: e.target.value })}
+                  >
+                    <option value="ROOT">ROOT (Initial Question for Topic)</option>
+                    <option value="CORRECT">IF CORRECT (Follow-up Probe)</option>
+                    <option value="STRONG">IF STRONG (Advanced Depth Probe)</option>
+                    <option value="PARTIAL">IF PARTIAL / STRUGGLING (Socratic Hint)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Parent Question in Tree (Optional)
+                </label>
+                <select
+                  className="input-field"
+                  value={nodeForm.parent_question_id || ''}
+                  onChange={e => {
+                    const val = e.target.value ? parseInt(e.target.value) : null;
+                    const parent = vivaDetails?.questions?.find(q => q.id === val);
+                    setNodeForm({
+                      ...nodeForm,
+                      parent_question_id: val,
+                      tree_depth: parent ? (parent.tree_depth || 0) + 1 : 0
+                    });
+                  }}
+                >
+                  <option value="">None (Top-Level Root Question)</option>
+                  {(vivaDetails?.questions || [])
+                    .filter(q => q.topic_id === parseInt(nodeForm.topic_id))
+                    .map(q => (
+                      <option key={q.id} value={q.id}>
+                        [{q.branch_condition}] {q.question_text.slice(0, 70)}...
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Advance Question Text *
+                </label>
+                <textarea
+                  className="input-field"
+                  rows={3}
+                  placeholder="e.g. How does AVL tree rebalancing guarantee O(log N) lookup time during consecutive insertions?"
+                  value={nodeForm.question_text}
+                  onChange={e => setNodeForm({ ...nodeForm, question_text: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Question Type
+                  </label>
+                  <select
+                    className="input-field"
+                    value={nodeForm.question_type}
+                    onChange={e => setNodeForm({ ...nodeForm, question_type: e.target.value })}
+                  >
+                    <option value="CONCEPT">CONCEPT (Fundamentals)</option>
+                    <option value="WHY">WHY (Depth & Invariance)</option>
+                    <option value="TRADE_OFF">TRADE_OFF (Architectural Choice)</option>
+                    <option value="APPLIED">APPLIED (Design / Implementation)</option>
+                    <option value="DEBUGGING">DEBUGGING (Failure Analysis)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Difficulty Level (1 to 5)
+                  </label>
+                  <select
+                    className="input-field"
+                    value={nodeForm.difficulty}
+                    onChange={e => setNodeForm({ ...nodeForm, difficulty: parseInt(e.target.value) })}
+                  >
+                    <option value={1}>1 - Beginner</option>
+                    <option value={2}>2 - Intermediate</option>
+                    <option value={3}>3 - Standard Technical</option>
+                    <option value={4}>4 - Advanced / Edge Probing</option>
+                    <option value={5}>5 - Mastery / FAANG Bar</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Expected Concepts (comma-separated keywords)
+                </label>
+                <input
+                  className="input-field"
+                  placeholder="e.g. balance factor, tree rotations, logarithmic height, monotonicity"
+                  value={nodeForm.expected_concepts}
+                  onChange={e => setNodeForm({ ...nodeForm, expected_concepts: e.target.value })}
+                />
+              </div>
+
+              {/* Terminal Leaf Checkbox */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 14px',
+                background: 'rgba(244, 63, 94, 0.08)',
+                border: '1px solid rgba(244, 63, 94, 0.25)',
+                borderRadius: 'var(--radius-md)'
+              }}>
+                <input
+                  type="checkbox"
+                  id="terminal"
+                  checked={nodeForm.is_terminal}
+                  onChange={e => setNodeForm({ ...nodeForm, is_terminal: e.target.checked })}
+                  style={{ width: '18px', height: '18px', accentColor: '#f43f5e', cursor: 'pointer' }}
+                />
+                <label htmlFor="terminal" style={{ fontSize: '12px', cursor: 'pointer', color: '#fca5a5' }}>
+                  <strong>Terminal Stop Node:</strong> When candidate answers this question, stop this topic tree and smoothly transition to the next topic.
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddNodeOpen(false)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '13px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingNode}
+                  className="btn btn-primary"
+                  style={{ fontSize: '13px', background: 'linear-gradient(135deg, #10b981, #06b6d4)' }}
+                >
+                  {addingNode ? 'Saving Node...' : 'Add to Question Tree'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Resume & Job Description Question Generator Modal */}
+      <ResumeQuestionGeneratorModal
+        isOpen={isResumeModalOpen}
+        onClose={() => setIsResumeModalOpen(false)}
+        onQuestionsApplied={() => {
+          loadVivaDetails();
+        }}
+      />
     </div>
   );
 }

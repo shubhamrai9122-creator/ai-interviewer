@@ -55,70 +55,109 @@ def seed_database(db: Session):
     db.add_all([t_arrays, t_trees, t_dp, t_applied])
     db.commit()
 
-    # 4. Question Bank (Approved & Tagged)
-    questions = [
-        # Arrays & Hash Maps
-        Question(
-            viva_id=42, topic_id=t_arrays.id,
-            question_text="How does a Hash Map achieve average O(1) time complexity for insertions and lookups, and what causes it to degrade?",
-            question_type=QuestionType.CONCEPT, difficulty=2,
-            expected_concepts=["hash function", "collision", "chaining", "load factor", "O(N) worst case"],
-            answer_key="Hash function computes index from key. Average O(1). Collisions handled by chaining or open addressing. Degrades to O(N) if many keys collide or bad hash function."
-        ),
-        Question(
-            viva_id=42, topic_id=t_arrays.id,
-            question_text="Why does dynamic array resizing take amortized O(1) time instead of O(N) on every append?",
-            question_type=QuestionType.WHY, difficulty=3,
-            expected_concepts=["geometric doubling", "amortized", "aggregate method", "capacity"],
-            answer_key="Resizing doubles capacity (e.g. 2x), meaning copy operations happen exponentially less frequently. N appends take O(N) total copies = O(1) amortized."
-        ),
-        Question(
-            viva_id=42, topic_id=t_arrays.id,
-            question_text="What happens if a hash function distributes all keys into a single bucket? How would you mitigate this in production?",
-            question_type=QuestionType.EDGE_CASE, difficulty=4,
-            expected_concepts=["degenerate linked list", "treeify", "red-black tree", "hash dos attack"],
-            answer_key="Degrades to O(N) linked list search. Modern implementations (like Java 8 HashMap) convert bucket to Red-Black Tree (O(log N)) when bucket size exceeds threshold."
-        ),
-        # Trees & Graphs
-        Question(
-            viva_id=42, topic_id=t_trees.id,
-            question_text="Explain the invariants of a Binary Search Tree (BST) and how searching works.",
-            question_type=QuestionType.CONCEPT, difficulty=2,
-            expected_concepts=["left subtree smaller", "right subtree greater", "O(log N)", "binary search"],
-            answer_key="For every node, all left descendants are smaller, all right descendants are greater. Search compares and goes left or right."
-        ),
-        Question(
-            viva_id=42, topic_id=t_trees.id,
-            question_text="Why does a standard BST degenerate into O(N) worst-case time, and how does an AVL tree prevent this using rotations?",
-            question_type=QuestionType.WHY, difficulty=4,
-            expected_concepts=["skewed tree", "sorted insertion", "balance factor", "rotations", "height balance"],
-            answer_key="Inserting sorted keys makes a skewed linked-list tree. AVL tracks balance factor (-1, 0, +1) and performs single or double rotations to preserve O(log N) height."
-        ),
-        Question(
-            viva_id=42, topic_id=t_trees.id,
-            question_text="In a directed graph, how would you detect a cycle? Contrast DFS with Kahn's algorithm.",
-            question_type=QuestionType.TRADE_OFF, difficulty=4,
-            expected_concepts=["back edge", "recursion stack", "indegree", "topological sort", "kahn algorithm"],
-            answer_key="DFS uses 3-color or recursion stack to find back-edges. Kahn's uses BFS with indegrees; if nodes processed < total nodes, cycle exists."
-        ),
-        # Applied & Debugging
-        Question(
-            viva_id=42, topic_id=t_applied.id,
-            question_text="Suppose your backend service reports a memory leak where Node.js heap memory climbs steadily under high API traffic. How do you isolate the root cause?",
-            question_type=QuestionType.APPLIED, difficulty=4,
-            expected_concepts=["heap snapshot", "garbage collection", "unclosed listeners", "global cache", "memory profiler"],
-            answer_key="Take heap snapshots using Chrome DevTools or Clinic.js. Compare retained sizes. Check for unbounded in-memory caches, unremoved event listeners, or circular references."
-        ),
-        Question(
-            viva_id=42, topic_id=t_applied.id,
-            question_text="Given a search API querying 10 million records, database CPU hits 100%. What caching and indexing strategies would you deploy first?",
-            question_type=QuestionType.APPLIED, difficulty=3,
-            expected_concepts=["redis cache", "b-tree index", "cache stampede", "explain query plan"],
-            answer_key="Analyze query with EXPLAIN. Add composite B-Tree indexes. Put Redis cache layer in front with TTL and mutex locks to prevent cache stampedes."
-        )
-    ]
-    for q in questions:
-        db.add(q)
+    # 4. Question Bank Structured as Topic Trees
+    # Tree 1: Arrays & Hash Maps
+    q1 = Question(
+        viva_id=42, topic_id=t_arrays.id,
+        question_text="How does a Hash Map achieve average O(1) time complexity for insertions and lookups, and what causes it to degrade?",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["hash function", "collision", "chaining", "load factor", "O(N) worst case"],
+        answer_key="Hash function computes index from key. Average O(1). Collisions handled by chaining or open addressing.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(q1)
+    db.commit()
+    db.refresh(q1)
+
+    q2 = Question(
+        viva_id=42, topic_id=t_arrays.id, parent_question_id=q1.id,
+        question_text="Why does dynamic array resizing take amortized O(1) time instead of O(N) on every append?",
+        question_type=QuestionType.WHY, difficulty=3,
+        expected_concepts=["geometric doubling", "amortized", "aggregate method", "capacity"],
+        answer_key="Resizing doubles capacity (2x), meaning copy operations happen exponentially less frequently.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=False
+    )
+    q_hint1 = Question(
+        viva_id=42, topic_id=t_arrays.id, parent_question_id=q1.id,
+        question_text="If two different keys compute to the exact same hash index, how does separate chaining link and search both values?",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["linked list", "bucket", "collision chaining"],
+        answer_key="Chaining stores elements sharing the same hash index in a linked list or bucket chain.",
+        tree_depth=2, branch_condition="PARTIAL", is_terminal=True
+    )
+    db.add_all([q2, q_hint1])
+    db.commit()
+    db.refresh(q2)
+
+    q3 = Question(
+        viva_id=42, topic_id=t_arrays.id, parent_question_id=q2.id,
+        question_text="What happens if a hash function distributes all keys into a single bucket? How does Java 8+ HashMap mitigate Hash-DoS using Red-Black trees?",
+        question_type=QuestionType.EDGE_CASE, difficulty=4,
+        expected_concepts=["degenerate linked list", "treeify", "red-black tree", "hash dos attack"],
+        answer_key="When bucket size exceeds 8, the bucket converts to a Red-Black Tree, bounding worst-case search to O(log N).",
+        tree_depth=3, branch_condition="STRONG", is_terminal=True
+    )
+    db.add(q3)
+    db.commit()
+
+    # Tree 2: Trees & Graphs
+    q4 = Question(
+        viva_id=42, topic_id=t_trees.id,
+        question_text="Explain the invariants of a Binary Search Tree (BST) and how searching works.",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["left subtree smaller", "right subtree greater", "O(log N)", "binary search"],
+        answer_key="For every node, all left descendants are smaller, all right descendants are greater. Search compares and goes left or right.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(q4)
+    db.commit()
+    db.refresh(q4)
+
+    q5 = Question(
+        viva_id=42, topic_id=t_trees.id, parent_question_id=q4.id,
+        question_text="Why does a standard BST degenerate into O(N) worst-case time, and how does an AVL tree prevent this using rotations?",
+        question_type=QuestionType.WHY, difficulty=4,
+        expected_concepts=["skewed tree", "sorted insertion", "balance factor", "rotations", "height balance"],
+        answer_key="Inserting sorted keys makes a skewed linked-list tree. AVL tracks balance factor (-1, 0, +1) and performs single or double rotations to preserve O(log N) height.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=False
+    )
+    db.add(q5)
+    db.commit()
+    db.refresh(q5)
+
+    q6 = Question(
+        viva_id=42, topic_id=t_trees.id, parent_question_id=q5.id,
+        question_text="In a directed graph, how would you detect a cycle? Contrast DFS with Kahn's topological sort algorithm.",
+        question_type=QuestionType.TRADE_OFF, difficulty=4,
+        expected_concepts=["back edge", "recursion stack", "indegree", "topological sort", "kahn algorithm"],
+        answer_key="DFS uses 3-color or recursion stack to find back-edges. Kahn's uses BFS with indegrees; if nodes processed < total nodes, cycle exists.",
+        tree_depth=3, branch_condition="STRONG", is_terminal=True
+    )
+    db.add(q6)
+    db.commit()
+
+    # Tree 3: Applied Engineering & Debugging
+    q7 = Question(
+        viva_id=42, topic_id=t_applied.id,
+        question_text="Given a search API querying 10 million records, database CPU hits 100%. What caching and indexing strategies would you deploy first?",
+        question_type=QuestionType.APPLIED, difficulty=3,
+        expected_concepts=["redis cache", "b-tree index", "cache stampede", "explain query plan"],
+        answer_key="Analyze query with EXPLAIN. Add composite B-Tree indexes. Put Redis cache layer in front with TTL and mutex locks to prevent cache stampedes.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(q7)
+    db.commit()
+    db.refresh(q7)
+
+    q8 = Question(
+        viva_id=42, topic_id=t_applied.id, parent_question_id=q7.id,
+        question_text="Suppose your backend service reports a memory leak where Node.js heap memory climbs steadily under high API traffic. How do you isolate the root cause?",
+        question_type=QuestionType.APPLIED, difficulty=4,
+        expected_concepts=["heap snapshot", "garbage collection", "unclosed listeners", "global cache", "memory profiler"],
+        answer_key="Take heap snapshots using Chrome DevTools or Clinic.js. Compare retained sizes. Check for unbounded in-memory caches, unremoved event listeners, or circular references.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=True
+    )
+    db.add(q8)
     db.commit()
 
     # 5. Seed 5 Realistic Sample Vivas (Full Transcripts, Evidence & Overrides)

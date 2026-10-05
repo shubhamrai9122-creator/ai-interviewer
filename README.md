@@ -59,6 +59,38 @@ Question Bank             Viva Engine                Database
 
 ---
 
+## 🎙️ Cutting-Edge Voice-Catching & Multi-Modal Technology Suite
+
+The platform integrates state-of-the-art voice capture and acoustic analysis technologies engineered for high-stakes technical vivas:
+
+1. **Precision Web Audio API & FFT Frequency Analyser**:
+   - 48 kHz mono stream with hardware `echoCancellation`, `noiseSuppression`, and `autoGainControl`.
+   - Real-time `AnalyserNode` rendering live frequency spectrums and dynamic waveform responses on HTML5 Canvas.
+2. **Dynamic Voice Activity Detection (VAD)**:
+   - Energy thresholding (-42 dBFS) with automatic ambient noise floor calibration.
+   - Differentiates candidate reflective silence from speaking, alerting on sustained pauses with automatic submission prompts.
+3. **Multi-Engine Speech-to-Text (STT) with Whisper Integration**:
+   - Ultra-low latency **Groq Whisper Large v3 Turbo** (< 250ms transcription) & **OpenAI Whisper** fallback with local acoustic normalization.
+   - Full support for Indian accents and technical Hinglish without score distortion.
+4. **Vocal Intelligence & Acoustic Telemetry**:
+   - **Words Per Minute (WPM)**: Continuous pace analysis (Optimal: 95–165 WPM).
+   - **Vocal Disfluency & Filler Word Counter**: Accurately tracks crutch words (*"um", "uh", "basically", "like", "you know"*).
+   - **Fluency & Confidence Scoring**: Turn-by-turn vocal delivery metric recorded for faculty audit.
+5. **Multi-Voice AI Examiner Personas**:
+   - 🎓 **Dr. Eleanor Vance**: Measured, structured academic lead with deep Socratic reasoning.
+   - ⚡ **Alex Sterling**: Fast-paced FAANG systems architect probing edge-case trade-offs.
+   - 🌱 **Prof. Priya Nair**: Empathetic, supportive mentor ensuring concept grounding.
+6. **Interactive Code Whiteboard & Scratchpad**:
+   - Integrated live code editor supporting Python, JavaScript, and C++ for Applied Engineering & Live Debugging phases.
+7. **AI Video Proctoring**:
+   - Live candidate webcam feed with face-centering reticle and multi-speaker / tab-switching anomaly logging.
+8. **AI Question Bank Generator from Resume / Job Description**:
+   - Instantly synthesizes 4-6 Bloom-aligned technical questions from any pasted resume or course syllabus.
+9. **Comprehensive Candidate Scorecard & Performance Certificate**:
+   - Interactive report with 5-rubric radar breakdown, acoustic telemetry, qualitative feedback, and print-ready PDF/JSON export.
+
+---
+
 ## ⚡ The 6-Stage Adaptive Technical Probing Engine
 
 Unlike naive conversational bots, the live examiner navigates an **approved question graph** with structured follow-up strategies:

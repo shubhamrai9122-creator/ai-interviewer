@@ -104,6 +104,9 @@ class Question(Base):
     expected_concepts = Column(JSON, default=list) # List of keywords/concepts student must mention
     answer_key = Column(Text, nullable=True)
     parent_question_id = Column(Integer, nullable=True)
+    branch_condition = Column(String(50), default="ROOT") # ROOT, CORRECT, STRONG, PARTIAL
+    tree_depth = Column(Integer, default=1)
+    is_terminal = Column(Boolean, default=False)
     source = Column(String(50), default="APPROVED_BANK") # APPROVED_BANK, AI_GENERATED_APPROVED
     status = Column(String(50), default="APPROVED") # APPROVED, PENDING
 
@@ -121,6 +124,8 @@ class VivaSession(Base):
     status = Column(SQLEnum(SessionStatus), default=SessionStatus.SETUP)
     current_phase = Column(SQLEnum(SessionPhase), default=SessionPhase.WARMUP)
     elapsed_seconds = Column(Float, default=0.0)
+    duration_minutes = Column(Integer, default=15) # 0 = unlimited, or faculty configured
+    current_topic_id = Column(Integer, nullable=True)
     audio_url = Column(String(255), nullable=True)
     transcript_url = Column(String(255), nullable=True)
     final_score = Column(Float, nullable=True)
@@ -128,6 +133,8 @@ class VivaSession(Base):
     flagged_for_review = Column(Boolean, default=False)
     flag_reason = Column(Text, nullable=True)
     scoring_prompt_version = Column(String(50), default="v1.0.0")
+    examiner_persona = Column(String(50), default="aria")
+    subject_domain = Column(String(100), default="Data Structures & Algorithms")
 
     viva = relationship("Viva", back_populates="sessions")
     questions_asked = relationship("QuestionAsked", back_populates="session", cascade="all, delete-orphan")
@@ -163,6 +170,11 @@ class StudentAnswer(Base):
     detected_concepts = Column(JSON, default=list)
     missing_concepts = Column(JSON, default=list)
     latency_ms = Column(Float, default=0.0)
+    audio_chunk_url = Column(String(255), nullable=True)
+    wpm = Column(Float, nullable=True)
+    filler_words = Column(JSON, default=dict)
+    fluency_score = Column(Float, nullable=True)
+    code_snippet = Column(Text, nullable=True)
 
     session = relationship("VivaSession", back_populates="answers")
     question_asked = relationship("QuestionAsked", back_populates="answers")
@@ -238,6 +250,25 @@ class StudentStartRequest(BaseModel):
     student_name: str
     viva_id: int = 1
     consent_given: bool = True
+    examiner_persona: str = "aria"
+    subject_domain: str = "Data Structures & Algorithms"
+    duration_minutes: Optional[int] = 15
+
+class VivaDurationUpdateRequest(BaseModel):
+    duration_minutes: int # 0 for unlimited, or e.g. 5, 10, 15, 30
+
+class QuestionTreeNodeCreate(BaseModel):
+    viva_id: int
+    topic_id: int
+    question_text: str
+    question_type: QuestionType = QuestionType.CONCEPT
+    difficulty: int = 2
+    expected_concepts: List[str] = Field(default_factory=list)
+    answer_key: Optional[str] = None
+    parent_question_id: Optional[int] = None
+    branch_condition: str = "CORRECT" # ROOT, CORRECT, STRONG, PARTIAL
+    tree_depth: int = 1
+    is_terminal: bool = False
 
 class StudentTurnRequest(BaseModel):
     session_id: int
@@ -247,6 +278,20 @@ class StudentTurnRequest(BaseModel):
     is_giveup: bool = False
     is_hint_request: bool = False
     project_claim: Optional[str] = None
+    code_snippet: Optional[str] = None
+    audio_chunk_url: Optional[str] = None
+    wpm: Optional[float] = None
+    filler_words: Optional[Dict[str, int]] = None
+    fluency_score: Optional[float] = None
+
+class ContextQuestionGenRequest(BaseModel):
+    context_text: str
+    role_title: str = "Full-Stack Engineer"
+    viva_id: int = 42
+
+class VoiceAcousticsRequest(BaseModel):
+    transcript: str
+    duration_sec: float
 
 class OverrideRequest(BaseModel):
     session_id: int
@@ -260,3 +305,18 @@ class IntegrityEventRequest(BaseModel):
     event_type: str
     details: str
     timestamp_sec: float
+
+class ProjectIngestRequest(BaseModel):
+    repo_url: Optional[str] = None
+    project_name: Optional[str] = "My AI Portfolio Project"
+    project_description: Optional[str] = None
+    target_role: str = "Staff Backend Engineer"
+    interview_mode: str = "standard" # quick, standard, deep
+    code_snippets: Optional[str] = None
+
+class ProjectVerdictRequest(BaseModel):
+    question_text: str
+    answer_transcript: str
+    expected_concepts: List[str] = Field(default_factory=list)
+    target_role: str = "Staff Backend Engineer"
+
