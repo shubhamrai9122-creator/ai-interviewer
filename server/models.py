@@ -320,3 +320,10 @@ class ProjectVerdictRequest(BaseModel):
     expected_concepts: List[str] = Field(default_factory=list)
     target_role: str = "Staff Backend Engineer"
 
+class SyllabusTreeUploadRequest(BaseModel):
+    viva_id: Optional[int] = 42
+    subject: str = "Data Structures & Algorithms"
+    difficulty: str = "Medium"
+    duration_minutes: int = 15
+    syllabus_text: str
+

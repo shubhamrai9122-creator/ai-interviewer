@@ -2,24 +2,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, Volume2, Shield, Clock, AlertTriangle, 
   Send, HelpCircle, FastForward, CheckCircle2, Award, FileText,
-  Settings, Code2, Sparkles, UserCheck, AudioLines
+  Settings, Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight
 } from 'lucide-react';
 
 import AudioVisualizer from './AudioVisualizer';
 import CodeWhiteboard from './CodeWhiteboard';
 import WebcamProctor from './WebcamProctor';
 import VoiceSettingsModal from './VoiceSettingsModal';
-import ResumeQuestionGeneratorModal from './ResumeQuestionGeneratorModal';
 import ScorecardModal from './ScorecardModal';
 import { AudioCaptureEngine, analyzeSpokenText } from '../utils/audioCapture';
 
 const API_BASE = 'http://localhost:8000';
 
 export default function StudentPortal() {
-  // Session setup state
+  // Domain selection (Strictly DSA or Web Development)
+  const [selectedDomain, setSelectedDomain] = useState('dsa'); // 'dsa' or 'webdev'
   const [studentId, setStudentId] = useState('STU001');
   const [studentName, setStudentName] = useState('Rahul Sharma');
-  const [subjectDomain, setSubjectDomain] = useState('CS302: Data Structures & Algorithms');
   const [consentGiven, setConsentGiven] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
   const [sessionId, setSessionId] = useState(null);
@@ -43,14 +42,13 @@ export default function StudentPortal() {
   const [codeContent, setCodeContent] = useState('');
   const [silenceNotice, setSilenceNotice] = useState(null);
 
-  // Voice Settings & Personas
+  // Voice Settings & Personas (Strictly Sweet Female Voices)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
-  const [selectedPersona, setSelectedPersona] = useState('aria');
+  const [selectedPersona, setSelectedPersona] = useState('grok_sweet');
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [sttEngine, setSttEngine] = useState('hybrid');
-  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechRate, setSpeechRate] = useState(0.98);
 
   // Audio Telemetry
   const [audioVolume, setAudioVolume] = useState(0);
@@ -65,23 +63,23 @@ export default function StudentPortal() {
     fluencyScore: 100
   });
 
-  // Integrity & tab switch alerts
+  // Integrity & Anti-Cheating Signals
   const [tabSwitchAlert, setTabSwitchAlert] = useState(false);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
 
   // References
   const audioEngineRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Helper to find sweet, natural female voice in browser
+  // Helper to select sweet, young female voice in browser
   const getSweetFemaleVoice = () => {
     if (!('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
     const preferred = [
-      'Samantha', 'Victoria', 'Karen', 'Tessa', 'Moira', 'Fiona',
-      'Google UK English Female', 'Google US English', 'Microsoft Zira',
-      'en-US-Standard-C', 'en-US-Standard-E'
+      'Samantha', 'Victoria', 'Karen', 'Tessa', 'Moira',
+      'Google UK English Female', 'Google US English', 'Microsoft Zira', 'Microsoft Jenny'
     ];
 
     for (const name of preferred) {
@@ -95,7 +93,7 @@ export default function StudentPortal() {
     return voices.find(v => v.lang.startsWith('en')) || voices[0];
   };
 
-  // Pre-load voices
+  // Pre-load voices & viva details
   useEffect(() => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.getVoices();
@@ -103,43 +101,38 @@ export default function StudentPortal() {
         window.speechSynthesis.getVoices();
       };
     }
-    // Fetch initial viva config to get duration
-    fetch(`${API_BASE}/api/vivas`)
+    const targetVivaId = selectedDomain === 'webdev' ? 43 : 42;
+    fetch(`${API_BASE}/api/vivas/${targetVivaId}`)
       .then(res => res.json())
       .then(data => {
-        if (data && data.length > 0) {
-          const v = data[0];
-          if (v.duration_minutes !== undefined) {
-            setDurationMinutes(v.duration_minutes);
-          }
+        if (data && data.duration_minutes !== undefined) {
+          setDurationMinutes(data.duration_minutes || 15);
         }
       })
       .catch(err => console.error('Failed to load viva details:', err));
-  }, []);
+  }, [selectedDomain]);
 
-  // Text-To-Speech with Persona configuration
+  // Text-To-Speech with Sweet Young Female Voice
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
+      const v = getSweetFemaleVoice();
+      if (v) utterance.voice = v;
 
-      if (selectedPersona === 'aria' || selectedPersona === 'priya' || selectedPersona === 'eleanor') {
-        const v = getSweetFemaleVoice();
-        if (v) utterance.voice = v;
-      }
-
-      if (selectedPersona === 'aria') {
-        utterance.rate = speechRate * 0.95; // Sweet, gentle cadence
-        utterance.pitch = 1.12;              // Pleasant, warm melodic pitch
-      } else if (selectedPersona === 'alex') {
-        utterance.rate = speechRate * 1.05;
-        utterance.pitch = 0.95;
-      } else if (selectedPersona === 'priya') {
-        utterance.rate = speechRate * 0.96;
-        utterance.pitch = 1.05;
-      } else {
+      // Sweet young tone calibrations (Pitch: 1.18 - 1.22)
+      if (selectedPersona === 'grok_sweet') {
         utterance.rate = speechRate * 0.98;
-        utterance.pitch = 1.0;
+        utterance.pitch = 1.22;
+      } else if (selectedPersona === 'aria') {
+        utterance.rate = speechRate * 0.95;
+        utterance.pitch = 1.18;
+      } else if (selectedPersona === 'maya') {
+        utterance.rate = speechRate * 0.97;
+        utterance.pitch = 1.15;
+      } else {
+        utterance.rate = speechRate * 0.94;
+        utterance.pitch = 1.16;
       }
 
       utterance.onstart = () => setIsAiSpeaking(true);
@@ -149,16 +142,17 @@ export default function StudentPortal() {
     }
   };
 
-  // Timer effect: increments every 1 second, respects dynamic / unlimited duration
+  // Hard 15-Minute Countdown Timer
   useEffect(() => {
     let timer;
     if (isStarted && !vivaCompleted) {
       timer = setInterval(() => {
         setElapsedSeconds(prev => {
           const next = prev + 1;
-          if (durationMinutes > 0 && next >= durationMinutes * 60) {
+          const totalDurationSec = (durationMinutes || 15) * 60;
+          if (durationMinutes > 0 && next >= totalDurationSec) {
             handleEndViva(next);
-            return durationMinutes * 60;
+            return totalDurationSec;
           }
           return next;
         });
@@ -167,66 +161,39 @@ export default function StudentPortal() {
     return () => clearInterval(timer);
   }, [isStarted, vivaCompleted, durationMinutes]);
 
-  // Tab switch detection
+  // Tab switch detection (Integrity Signal)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && isStarted && !vivaCompleted && sessionId) {
         setTabSwitchAlert(true);
+        setTabSwitchCount(c => c + 1);
         fetch(`${API_BASE}/api/session/integrity`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             session_id: sessionId,
             event_type: 'TAB_SWITCH',
-            details: 'Browser window tab switched during viva questioning.',
+            details: `Candidate tab unfocused at ${elapsedSeconds}s.`,
             timestamp_sec: elapsedSeconds
           })
-        }).catch(err => console.error(err));
+        }).catch(err => console.warn('Integrity log failed:', err));
       }
     };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isStarted, vivaCompleted, sessionId, elapsedSeconds]);
 
-  // Update acoustic metrics on text input changes
-  useEffect(() => {
-    if (studentInput) {
-      const turnDuration = speechTurnStartSec ? Math.max(2, elapsedSeconds - speechTurnStartSec) : 5;
-      const metrics = analyzeSpokenText(studentInput, turnDuration);
-      setAcousticMetrics(metrics);
-    }
-  }, [studentInput, elapsedSeconds, speechTurnStartSec]);
-
-  // Voice Catching Engine Start / Stop
-  const toggleVoiceCapture = async () => {
-    if (isListening) {
-      // Stop recording
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-      if (audioEngineRef.current) {
-        try { await audioEngineRef.current.stop(); } catch (e) {}
-      }
-      setIsListening(false);
-      setIsSpeakingLive(false);
-      setAudioVolume(0);
-      setSilenceNotice(null);
-      return;
-    }
-
+  // Setup live audio capture
+  const setupAudioCapture = async () => {
     try {
-      setSpeechTurnStartSec(elapsedSeconds);
-      setSilenceNotice(null);
-
-      // 1. Initialize Web Audio API Analyser & MediaRecorder
       const engine = new AudioCaptureEngine({
-        onVolumeChange: ({ volume, frequencyData }) => {
+        onFrequencyData: (data) => setFrequencyData(data),
+        onVolumeChange: ({ volume, isSpeaking }) => {
           setAudioVolume(volume);
-          setFrequencyData(frequencyData);
-        },
-        onSpeakingChange: (speaking) => {
-          setIsSpeakingLive(speaking);
-          if (speaking) {
+          setIsSpeakingLive(isSpeaking);
+          if (isSpeaking && !speechTurnStartSec) {
+            setSpeechTurnStartSec(elapsedSeconds);
             setSilenceNotice(null);
           }
         },
@@ -235,14 +202,14 @@ export default function StudentPortal() {
             setSilenceNotice(`Sustained silence (${silenceDurationSec}s). Click 'Submit Answer' when ready.`);
           }
         },
-        silenceThresholdSec: 3.0,
+        silenceThresholdSec: 3.5,
         dbThreshold: -42
       });
 
       await engine.start();
       audioEngineRef.current = engine;
 
-      // 2. Initialize Web Speech Recognition for instant streaming text
+      // Web Speech Recognition for instant streaming text
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
@@ -263,7 +230,6 @@ export default function StudentPortal() {
         };
 
         recognition.onend = () => {
-          // If user still recording, restart recognition
           if (audioEngineRef.current && audioEngineRef.current.isRecording) {
             try { recognition.start(); } catch (err) {}
           }
@@ -275,7 +241,7 @@ export default function StudentPortal() {
 
       setIsListening(true);
     } catch (err) {
-      alert('Microphone access failed: ' + err.message + '. You may type your response.');
+      console.warn('Microphone access note:', err.message);
       setIsListening(false);
     }
   };
@@ -287,69 +253,68 @@ export default function StudentPortal() {
       return;
     }
 
+    const vivaId = selectedDomain === 'webdev' ? 43 : 42;
+    const domainTitle = selectedDomain === 'webdev'
+      ? 'CS304: Modern Web Development & Full-Stack Systems'
+      : 'CS302: Data Structures & Algorithms';
+
     try {
       const res = await fetch(`${API_BASE}/api/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          student_id: studentId,
-          student_name: studentName,
-          viva_id: 42,
+          student_id: studentId.trim(),
+          student_name: studentName.trim(),
+          viva_id: vivaId,
           consent_given: true,
           examiner_persona: selectedPersona,
-          subject_domain: subjectDomain,
-          duration_minutes: durationMinutes
+          subject_domain: domainTitle,
+          duration_minutes: durationMinutes || 15
         })
       });
       const data = await res.json();
       setSessionId(data.session_id);
-      if (data.duration_minutes !== undefined) {
-        setDurationMinutes(data.duration_minutes);
-      }
-      setIsStarted(true);
-      setAiQuestion(data.initial_prompt);
+      setAiQuestion(data.first_question);
       setCurrentPhase(data.phase);
-      setTranscriptFeed([{
-        speaker: 'AI Examiner',
-        text: data.initial_prompt,
-        time: '00:00',
-        persona: selectedPersona
-      }]);
-      speakText(data.initial_prompt);
+      setQuestionType(data.question_type);
+      setIsStarted(true);
+
+      setTranscriptFeed([
+        {
+          speaker: 'Grok / Aria AI Examiner',
+          text: data.first_question,
+          time: '00:00',
+          type: data.question_type
+        }
+      ]);
+
+      speakText(data.first_question);
+      await setupAudioCapture();
     } catch (err) {
-      alert('Failed to connect to Viva Server: ' + err.message);
+      alert('Failed to initialize viva session: ' + err.message);
     }
   };
 
   // Submit Answer Turn
-  const handleTurnSubmit = async ({ isGiveup = false, isHintReq = false } = {}) => {
-    if (!sessionId) return;
-
-    let audioBlob = null;
-    if (audioEngineRef.current) {
-      try {
-        audioBlob = await audioEngineRef.current.stop();
-      } catch (e) {}
+  const handleTurnSubmit = async (isGiveup = false, isHintReq = false) => {
+    if (isSubmitting || !sessionId) return;
+    const answerText = studentInput.trim();
+    if (!answerText && !isGiveup && !isHintReq && !codeContent.trim()) {
+      alert('Please speak or type your technical response before submitting.');
+      return;
     }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) {}
-    }
-
-    setIsListening(false);
-    setIsSpeakingLive(false);
-    setAudioVolume(0);
-    setSilenceNotice(null);
-
-    const answerText = isGiveup ? "I don't know the exact answer to this, can we move to the next topic?" :
-                       isHintReq ? "Could you give me a small hint on this concept?" :
-                       studentInput.trim();
-
-    if (!answerText && !isGiveup && !isHintReq && !codeContent.trim()) return;
 
     setIsSubmitting(true);
+    setSilenceNotice(null);
+
+    // Stop current speech chunk
+    let audioBlob = null;
+    if (audioEngineRef.current) {
+      audioBlob = await audioEngineRef.current.getAudioBlob();
+    }
     const answerSec = elapsedSeconds;
 
-    // Optional: Upload audio turn to backend if blob exists
+    // Upload audio turn
     let recordedAudioUrl = null;
     if (audioBlob && audioBlob.size > 0) {
       try {
@@ -370,18 +335,15 @@ export default function StudentPortal() {
       }
     }
 
-    // Append student answer to feed
+    // Append to transcript
     setTranscriptFeed(prev => [
       ...prev,
       {
         speaker: studentName,
-        text: answerText,
+        text: answerText || (codeContent ? '[Submitted Code Solution]' : '[Skipped]'),
         time: formatTime(answerSec),
-        codeSnippet: codeContent ? codeContent : null,
-        audioUrl: recordedAudioUrl,
-        wpm: acousticMetrics.wpm,
-        fillers: acousticMetrics.totalFillers,
-        fluency: acousticMetrics.fluencyScore
+        codeSnippet: codeContent || null,
+        audioUrl: recordedAudioUrl
       }
     ]);
 
@@ -413,8 +375,8 @@ export default function StudentPortal() {
       setQuestionType(data.question_type);
       setLastLatencyMs(data.latency_ms);
 
-      // Auto-open whiteboard if question type is APPLIED or DEBUGGING
-      if (['APPLIED', 'DEBUGGING'].includes(data.question_type)) {
+      // Auto open whiteboard if question is applied/code
+      if (['APPLIED', 'DEBUGGING', 'EDGE_CASE'].includes(data.question_type)) {
         setShowCodePad(true);
       }
 
@@ -470,75 +432,226 @@ export default function StudentPortal() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const getPhaseBadge = (phase) => {
-    switch (phase) {
-      case 'WARMUP': return <span className="badge badge-blue">Warm-up & Audio Check</span>;
-      case 'FUNDAMENTALS': return <span className="badge badge-purple">Fundamentals Probing</span>;
-      case 'DEPTH': return <span className="badge badge-cyan">Depth & Reasoning</span>;
-      case 'APPLIED': return <span className="badge badge-amber">Applied Engineering</span>;
-      case 'WRAPUP': return <span className="badge badge-rose">Wrap-up & Evaluation</span>;
-      default: return <span className="badge badge-emerald">Scoring Phase</span>;
-    }
-  };
+  // Remaining time for 15-minute countdown
+  const totalLimitSec = (durationMinutes || 15) * 60;
+  const remainingSec = Math.max(0, totalLimitSec - elapsedSeconds);
+  const isTimeCritical = remainingSec <= 120 && durationMinutes > 0;
+  const isTimeWarning = remainingSec <= 300 && durationMinutes > 0;
 
-  // 1. Pre-Viva Check-in Screen
+  // 1. Pre-Viva Check-in Screen (Dominant White & Mixed Cosmic Theme)
   if (!isStarted) {
     return (
-      <div style={{ maxWidth: '960px', margin: '40px auto', padding: '0 20px' }}>
-        <div className="glass-panel" style={{ padding: '36px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+      <div style={{ maxWidth: '980px', margin: '36px auto', padding: '0 24px' }}>
+        <div className="glass-panel" style={{ padding: '36px 40px', background: '#FFFFFF' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{
-                width: '56px', height: '56px', borderRadius: '16px',
-                background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(236, 72, 153, 0.4)'
+                width: '54px',
+                height: '54px',
+                borderRadius: '16px',
+                background: 'radial-gradient(circle at 35% 35%, #FFE9B8, var(--sun) 55%, #D97706)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)'
               }}>
-                <Shield size={28} color="#fff" />
+                <Shield size={26} color="#FFFFFF" />
               </div>
               <div>
-                <h2 style={{ fontSize: '24px', fontWeight: '800' }}>AI Technical Viva Check-in</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Next-Gen Oral Examination • Natural Voice AI Examiner & Topic Tree Probing
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="eyebrow" style={{ fontSize: '0.7rem' }}>
+                    STANDARDIZED TECHNICAL VIVA
+                  </span>
+                  <span className="badge badge-dark" style={{ fontSize: '9px' }}>
+                    DSA & WEB DEV ONLY
+                  </span>
+                </div>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: '22px', fontWeight: 800, marginTop: '2px' }} className="sheen-text">
+                  Candidate Check-in & Oral Exam Room
+                </h2>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setIsResumeModalOpen(true)}
-                className="btn btn-secondary"
-                style={{ fontSize: '12px' }}
-              >
-                <Sparkles size={14} color="var(--purple)" />
-                Generate from Resume / JD
-              </button>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '12px' }}
+            >
+              <Settings size={14} />
+              Sweet Voice Settings
+            </button>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                className="btn btn-secondary"
-                style={{ fontSize: '12px' }}
+          {/* Subject Selector: DSA vs Web Development */}
+          <div style={{ marginBottom: '28px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: '12px' }}>
+              Select Viva Examination Subject (Strictly DSA or Web Development)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {/* DSA Option */}
+              <div
+                onClick={() => setSelectedDomain('dsa')}
+                style={{
+                  padding: '20px',
+                  borderRadius: 'var(--radius-md)',
+                  border: `2px solid ${selectedDomain === 'dsa' ? 'var(--sun)' : 'var(--rule)'}`,
+                  background: selectedDomain === 'dsa' ? '#FFFBEB' : '#FFFFFF',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedDomain === 'dsa' ? '0 4px 16px rgba(245, 158, 11, 0.18)' : 'var(--shadow-sm)'
+                }}
               >
-                <Settings size={14} />
-                Voice Settings
-              </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
+                    Data Structures & Algorithms (DSA)
+                  </span>
+                  {selectedDomain === 'dsa' && (
+                    <span className="badge badge-amber" style={{ fontSize: '10px' }}>
+                      <CheckCircle2 size={12} /> Selected
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
+                  Arrays, Hash Maps, BST/AVL Rotations, Dynamic Programming (Knapsack), Kahn's Graph Cycles, Big-O trade-offs.
+                </p>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-purple" style={{ fontSize: '9px' }}>Trees & Graphs</span>
+                  <span className="badge badge-cyan" style={{ fontSize: '9px' }}>DP Optimization</span>
+                  <span className="badge badge-amber" style={{ fontSize: '9px' }}>O(1) Hashing</span>
+                </div>
+              </div>
+
+              {/* Web Development Option */}
+              <div
+                onClick={() => setSelectedDomain('webdev')}
+                style={{
+                  padding: '20px',
+                  borderRadius: 'var(--radius-md)',
+                  border: `2px solid ${selectedDomain === 'webdev' ? 'var(--nebula)' : 'var(--rule)'}`,
+                  background: selectedDomain === 'webdev' ? '#EEF2FF' : '#FFFFFF',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedDomain === 'webdev' ? '0 4px 16px rgba(99, 102, 241, 0.18)' : 'var(--shadow-sm)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
+                    Web Development & Full-Stack Systems
+                  </span>
+                  {selectedDomain === 'webdev' && (
+                    <span className="badge badge-purple" style={{ fontSize: '10px' }}>
+                      <CheckCircle2 size={12} /> Selected
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
+                  React 19 Virtual DOM & Fiber, Node.js Event Loop Microtasks, REST Idempotency, WebSockets, DB Indexing & ACID.
+                </p>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-cyan" style={{ fontSize: '9px' }}>React Fiber</span>
+                  <span className="badge badge-purple" style={{ fontSize: '9px' }}>Event Loop</span>
+                  <span className="badge badge-emerald" style={{ fontSize: '9px' }}>B-Tree Indexing</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Consent Checkbox - Controls Entry Box Activation */}
+          {/* Student ID & Name */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Candidate Student ID
+              </label>
+              <input
+                className="input-field mono"
+                value={studentId}
+                onChange={e => setStudentId(e.target.value.toUpperCase())}
+                placeholder="e.g. STU001"
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Candidate Full Name
+              </label>
+              <input
+                className="input-field"
+                value={studentName}
+                onChange={e => setStudentName(e.target.value)}
+                placeholder="e.g. Rahul Sharma"
+              />
+            </div>
+          </div>
+
+          {/* Sweet Voice Persona Indicator */}
+          <div style={{
+            background: '#FDF2F8',
+            border: '1px solid rgba(225, 29, 72, 0.25)',
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span className="sun-pulse" style={{ background: '#E11D48', boxShadow: '0 0 10px #E11D48' }} />
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
+                  Interviewer Voice: {selectedPersona === 'grok_sweet' ? 'Grok Sweet AI (Bright & Youthful)' : selectedPersona === 'aria' ? 'Aria Sweet (Warm & Cheerful)' : selectedPersona === 'maya' ? 'Maya (Youthful Tech Lead)' : 'Zara (Sweet Socratic)'}
+                </span>
+                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                  Sweet young female voice tuned at pitch 1.22x with Web Speech synthesis • Zero male voices
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '11px', padding: '4px 12px' }}
+            >
+              Test Voice
+            </button>
+          </div>
+
+          {/* Hard 15-Minute Rule Notice */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid var(--rule)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 20px',
+            marginBottom: '24px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} color="var(--ice)" />
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
+                  Hard 15-Minute Exam Duration
+                </span>
+              </div>
+              <span className="badge badge-dark" style={{ fontSize: '10px' }}>
+                15:00 Countdown Limit
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: 0, lineHeight: '1.5' }}>
+              The viva adheres strictly to a 15-minute countdown. The AI will navigate adaptive topic trees, dig deeper into strong responses, advance gracefully on weak ones, and wrap up automatically at 0:00 with full multi-dimensional rubric marks.
+            </p>
+          </div>
+
+          {/* Mandatory Academic Consent Checkbox (Unlocks Entry Box / Start) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '16px',
             padding: '20px',
-            background: consentGiven ? 'rgba(16, 185, 129, 0.08)' : 'rgba(99, 102, 241, 0.08)',
-            border: `1.5px solid ${consentGiven ? 'rgba(16, 185, 129, 0.4)' : 'rgba(99, 102, 241, 0.3)'}`,
+            background: consentGiven ? '#F0FDF4' : '#F8FAFC',
+            border: `2px solid ${consentGiven ? '#10B981' : 'var(--rule)'}`,
             borderRadius: 'var(--radius-md)',
-            marginBottom: '24px',
-            transition: 'all 0.3s ease'
+            marginBottom: '28px',
+            transition: 'all 0.2s ease'
           }}>
             <label htmlFor="consent" style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', cursor: 'pointer', flex: 1 }}>
               <input
@@ -546,14 +659,14 @@ export default function StudentPortal() {
                 id="consent"
                 checked={consentGiven}
                 onChange={e => setConsentGiven(e.target.checked)}
-                style={{ marginTop: '3px', width: '22px', height: '22px', accentColor: '#10b981', cursor: 'pointer' }}
+                style={{ marginTop: '3px', width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
               />
               <div>
-                <span style={{ fontSize: '15px', fontWeight: '700', color: consentGiven ? '#34d399' : '#fff' }}>
-                  {consentGiven ? 'Academic Consent Acknowledged' : 'Click to Agree & Unlock Entry Box'}
+                <span style={{ fontSize: '14px', fontWeight: 800, color: consentGiven ? '#047857' : 'var(--ink)' }}>
+                  {consentGiven ? 'Academic Consent Acknowledged & Verified' : 'Check to Agree & Unlock Viva Examination'}
                 </span>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                  I consent to audio stream recording, timestamped AI transcription, and proctoring telemetry for post-exam faculty evaluation.
+                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                  I consent to audio recording, timestamped speech transcription, and proctoring telemetry (tab-switch & silence tracking) for faculty evaluation.
                 </p>
               </div>
             </label>
@@ -562,130 +675,26 @@ export default function StudentPortal() {
             </span>
           </div>
 
-          {/* Entry Box: Turned OFF until consent checkbox is clicked */}
-          {!consentGiven ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '36px 20px',
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px dashed var(--border-subtle)',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '24px'
-            }}>
-              <Shield size={36} color="var(--primary-light)" style={{ marginBottom: '12px', opacity: 0.8 }} />
-              <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Entry Box is Locked</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px', maxWidth: '480px', margin: '0 auto' }}>
-                Please select the check button above to activate the candidate entry box and begin your viva examination. No password login needed!
-              </p>
-            </div>
-          ) : (
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                <div>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
-                    Candidate Student ID
-                  </label>
-                  <input
-                    className="input-field mono"
-                    value={studentId}
-                    onChange={e => setStudentId(e.target.value.toUpperCase())}
-                    placeholder="e.g. STU001"
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
-                    Candidate Full Name
-                  </label>
-                  <input
-                    className="input-field"
-                    value={studentName}
-                    onChange={e => setStudentName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
-                  Exam Domain / Syllabus
-                </label>
-                <input
-                  className="input-field"
-                  value={subjectDomain}
-                  onChange={e => setSubjectDomain(e.target.value)}
-                  placeholder="e.g. CS302: Data Structures & Algorithms"
-                />
-              </div>
-
-              {/* Examiner Persona Badge */}
-              <div style={{
-                background: 'rgba(236, 72, 153, 0.08)',
-                border: '1px solid rgba(236, 72, 153, 0.3)',
-                borderRadius: 'var(--radius-md)',
-                padding: '16px 20px',
-                marginBottom: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ec4899' }} />
-                  <div>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
-                      Assigned Voice: {selectedPersona === 'aria' ? 'Aria (Sweet & Friendly AI Interviewer)' : selectedPersona === 'alex' ? 'Alex Sterling (FAANG Architect)' : selectedPersona === 'priya' ? 'Prof. Priya Nair (Socratic Mentor)' : 'Dr. Eleanor Vance (Academic Lead)'}
-                    </span>
-                    <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                      High-Fidelity Voice Synthesis • Speech Speed: {speechRate}x
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                >
-                  Change Voice
-                </button>
-              </div>
-
-              {/* Duration & Topic Tree Configuration */}
-              <div style={{
-                background: 'rgba(11, 17, 32, 0.6)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px 20px',
-                marginBottom: '24px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <Clock size={16} color="var(--cyan)" />
-                    Exam Duration: {durationMinutes === 0 ? 'Unlimited Mode (Admin Configured)' : `${durationMinutes} Minutes (Admin Configured)`}
-                  </h3>
-                  <span className="badge badge-purple" style={{ fontSize: '11px' }}>
-                    {durationMinutes === 0 ? 'Adaptive Question Trees' : `${durationMinutes}m Scheduled`}
-                  </span>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0, lineHeight: '1.5' }}>
-                  {durationMinutes === 0
-                    ? 'Faculty has set duration to open-ended. The AI interviewer will ask questions through branching topic trees until evaluation is complete.'
-                    : `Duration is set by faculty/admin (${durationMinutes} minutes). Questions follow structured topic trees with follow-ups and hints.`}
-                </p>
-              </div>
-
-              {/* Action button */}
-              <button
-                onClick={handleStartViva}
-                disabled={!studentName.trim() || !studentId.trim()}
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '16px', fontSize: '16px', background: 'linear-gradient(135deg, #6366f1, #ec4899)' }}
-              >
-                Launch Adaptive Viva Room
-              </button>
-            </div>
-          )}
+          {/* Action button */}
+          <button
+            onClick={handleStartViva}
+            disabled={!consentGiven || !studentName.trim() || !studentId.trim()}
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              padding: '16px',
+              fontSize: '15px',
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              background: consentGiven ? '#0F172A' : '#94A3B8',
+              cursor: consentGiven ? 'pointer' : 'not-allowed'
+            }}
+          >
+            {consentGiven ? 'Start Adaptive Technical Viva (15-Min)' : 'Please Agree to Consent Above to Unlock'}
+          </button>
         </div>
 
-        {/* Settings & Question Generator Modals */}
+        {/* Voice Settings Modal */}
         <VoiceSettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
@@ -696,50 +705,67 @@ export default function StudentPortal() {
           speechRate={speechRate}
           onChangeSpeechRate={setSpeechRate}
         />
-
-        <ResumeQuestionGeneratorModal
-          isOpen={isResumeModalOpen}
-          onClose={() => setIsResumeModalOpen(false)}
-          onQuestionsApplied={(questions, role) => {
-            setSubjectDomain(role);
-          }}
-        />
       </div>
     );
   }
 
-  // 2. Active Viva Room Interface
+  // 2. Active Viva Room Interface (White & Mixed Cosmic Theme)
   return (
-    <div style={{ maxWidth: '1440px', margin: '20px auto', padding: '0 24px' }}>
-      {/* Top Session Progress Bar */}
-      <div className="glass-panel" style={{ padding: '14px 24px', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span className="mono" style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary-light)' }}>
-              {formatTime(elapsedSeconds)}
+    <div style={{ maxWidth: '1440px', margin: '24px auto', padding: '0 24px' }}>
+      {/* Top Session Bar with Hard 15-Minute Countdown */}
+      <div className="glass-panel" style={{ padding: '16px 24px', marginBottom: '20px', background: '#FFFFFF' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
+          {/* Time & Phase */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Hard 15-Minute Countdown Display */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '999px',
+              background: isTimeCritical ? '#FEF2F2' : isTimeWarning ? '#FFFBEB' : '#F1F5F9',
+              border: `1.5px solid ${isTimeCritical ? '#EF4444' : isTimeWarning ? '#F59E0B' : 'var(--rule)'}`
+            }}>
+              <Clock size={16} color={isTimeCritical ? '#EF4444' : isTimeWarning ? '#F59E0B' : 'var(--ink)'} />
+              <span className="mono" style={{
+                fontSize: '16px',
+                fontWeight: 800,
+                color: isTimeCritical ? '#EF4444' : isTimeWarning ? '#B45309' : 'var(--ink)'
+              }}>
+                {formatTime(remainingSec)} left
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                / 15:00
+              </span>
+            </div>
+
+            <span className="badge badge-dark">
+              {selectedDomain === 'webdev' ? 'Web Development Viva' : 'DSA Technical Viva'}
             </span>
-            <span style={{ color: 'var(--text-dim)', fontSize: '13px' }}>
-              {durationMinutes === 0 ? '/ Unlimited' : `/ ${formatTime(durationMinutes * 60)}`}
+
+            <span className="badge badge-purple">
+              {currentPhase}
             </span>
-            {getPhaseBadge(currentPhase)}
           </div>
 
-          {/* Dynamic Progress Bar */}
-          <div style={{ flex: 1, maxWidth: '400px', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+          {/* Progress bar */}
+          <div style={{ flex: 1, maxWidth: '360px', height: '8px', background: '#F1F5F9', borderRadius: '999px', overflow: 'hidden' }}>
             <div style={{
-              width: durationMinutes > 0 ? `${Math.min(100, (elapsedSeconds / (durationMinutes * 60)) * 100)}%` : '100%',
+              width: `${Math.min(100, (elapsedSeconds / totalLimitSec) * 100)}%`,
               height: '100%',
-              background: durationMinutes > 0 ? 'linear-gradient(90deg, var(--primary), var(--cyan))' : 'linear-gradient(90deg, #ec4899, #8b5cf6)',
+              background: isTimeCritical ? '#EF4444' : 'linear-gradient(90deg, var(--nebula), var(--ice))',
               borderRadius: '999px',
               transition: 'width 1s linear'
             }} />
           </div>
 
+          {/* Quick Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               onClick={() => setShowCodePad(!showCodePad)}
               className={`btn ${showCodePad ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '12px', padding: '6px 12px' }}
+              style={{ fontSize: '12px', padding: '6px 14px' }}
             >
               <Code2 size={14} />
               {showCodePad ? 'Hide Code Pad' : 'Open Code Pad'}
@@ -748,28 +774,28 @@ export default function StudentPortal() {
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '6px 12px' }}
+              style={{ fontSize: '12px', padding: '6px 14px' }}
             >
               <Settings size={14} />
-              Voice Settings
+              Voice
             </button>
 
             <button
               onClick={() => handleEndViva()}
               className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '6px 12px' }}
+              style={{ fontSize: '12px', padding: '6px 14px', color: '#BE123C' }}
             >
-              Wrap-up Early
+              Conclude Viva
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tab Switch Alert */}
+      {/* Tab Switch Alert (Integrity Alert) */}
       {tabSwitchAlert && (
         <div style={{
-          background: 'rgba(244, 63, 94, 0.15)',
-          border: '1px solid var(--rose)',
+          background: '#FFF1F2',
+          border: '1.5px solid #E11D48',
           borderRadius: 'var(--radius-md)',
           padding: '12px 18px',
           marginBottom: '16px',
@@ -777,20 +803,20 @@ export default function StudentPortal() {
           alignItems: 'center',
           gap: '12px',
           fontSize: '13px',
-          color: '#fecdd3'
+          color: '#9F1239'
         }}>
-          <AlertTriangle size={18} color="var(--rose)" />
+          <AlertTriangle size={18} color="#E11D48" />
           <span>
-            <strong>Integrity Notice:</strong> Window unfocused. Tab switching has been logged with timestamps for faculty audit review.
+            <strong>Integrity Warning:</strong> Tab switch detected (#{tabSwitchCount}). Your examiner and faculty review board have been notified. Please stay focused on the viva window.
           </span>
         </div>
       )}
 
-      {/* Silence countdown banner */}
+      {/* Silence Alert */}
       {silenceNotice && (
         <div style={{
-          background: 'rgba(245, 158, 11, 0.15)',
-          border: '1px solid var(--amber)',
+          background: '#FFFBEB',
+          border: '1.5px solid #F59E0B',
           borderRadius: 'var(--radius-md)',
           padding: '10px 16px',
           marginBottom: '16px',
@@ -798,47 +824,48 @@ export default function StudentPortal() {
           alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: '13px',
-          color: '#fef3c7'
+          color: '#92400E'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={16} color="var(--amber)" />
+            <Clock size={16} color="#F59E0B" />
             <span>{silenceNotice}</span>
           </div>
           <button
             type="button"
             onClick={() => handleTurnSubmit()}
             className="btn btn-primary"
-            style={{ fontSize: '11px', padding: '4px 10px', height: '26px' }}
+            style={{ fontSize: '11px', padding: '4px 12px' }}
           >
             Submit Now
           </button>
         </div>
       )}
 
-      {/* Main Layout Grid */}
+      {/* Main Examination Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: showCodePad ? '1fr 1fr 1fr' : '1.25fr 1fr',
+        gridTemplateColumns: showCodePad ? '1fr 1fr 1fr' : '1.2fr 1fr',
         gap: '20px'
       }}>
-        {/* Left Column: Examiner Audio & Current Question Card */}
+        {/* Left Column: AI Examiner & Active Question */}
         <div>
-          <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px' }}>
+          {/* Active Question Card */}
+          <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px', background: '#FFFFFF' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="badge badge-purple">{questionType} PROBE</span>
+                <span className="badge badge-purple">{questionType} QUESTION</span>
                 {lastLatencyMs && (
-                  <span className="mono" style={{ fontSize: '11px', color: 'var(--emerald)' }}>
-                    ⚡ TTFT: {lastLatencyMs}ms
+                  <span className="mono" style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                    ⚡ Turnaround: {lastLatencyMs}ms
                   </span>
                 )}
               </div>
 
               {isAiSpeaking && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Volume2 size={16} color="var(--cyan)" />
-                  <span style={{ fontSize: '12px', color: 'var(--cyan)', fontWeight: '600' }}>
-                    AI Speaking ({selectedPersona})...
+                  <Volume2 size={16} color="var(--ice)" />
+                  <span style={{ fontSize: '12px', color: 'var(--ice)', fontWeight: 700 }}>
+                    Sweet Voice Speaking...
                   </span>
                 </div>
               )}
@@ -848,187 +875,173 @@ export default function StudentPortal() {
             <div style={{ marginBottom: '16px' }}>
               <AudioVisualizer
                 frequencyData={frequencyData}
+                isSpeaking={isSpeakingLive || isAiSpeaking}
                 volume={audioVolume}
-                isSpeaking={isSpeakingLive}
-                isAiSpeaking={isAiSpeaking}
-                label="Voice Spectrum"
               />
             </div>
 
-            {/* AI Question Text */}
-            <h3 style={{ fontSize: '17px', fontWeight: '700', lineHeight: '1.5', color: '#fff', marginBottom: '16px' }}>
-              "{aiQuestion}"
-            </h3>
-
-            {/* Acoustic Intelligence Metrics Bar */}
+            {/* Question Text */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'rgba(255, 255, 255, 0.03)',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              marginBottom: '14px',
-              fontSize: '11px'
+              background: '#F8FAFC',
+              border: '1px solid var(--rule)',
+              borderRadius: 'var(--radius-md)',
+              padding: '20px',
+              marginBottom: '16px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AudioLines size={14} color="var(--cyan)" />
-                <span style={{ color: 'var(--text-muted)' }}>Pacing:</span>
-                <span style={{ fontWeight: '700', color: '#fff' }}>{acousticMetrics.wpm} WPM</span>
-                <span style={{ color: 'var(--emerald)' }}>({acousticMetrics.wpmStatus})</span>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--nebula)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>
+                Examiner Probe:
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Fillers: </span>
-                  <span style={{ fontWeight: '700', color: acousticMetrics.totalFillers > 3 ? 'var(--amber)' : '#fff' }}>
-                    {acousticMetrics.totalFillers}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Fluency: </span>
-                  <span style={{ fontWeight: '700', color: 'var(--cyan)' }}>
-                    {acousticMetrics.fluencyScore}%
-                  </span>
-                </div>
-              </div>
+              <p style={{
+                fontFamily: 'var(--body)',
+                fontSize: '17px',
+                fontWeight: 600,
+                color: 'var(--ink)',
+                lineHeight: '1.5'
+              }}>
+                {aiQuestion || 'Listening to your thoughts...'}
+              </p>
             </div>
 
-            {/* Candidate Answer Controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Candidate Spoken Input / Entry Box */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  Your Spoken Answer (Hindi/Hinglish Supported):
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="sun-pulse" style={{ width: '7px', height: '7px', background: isListening ? '#10B981' : '#94A3B8' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>
+                    {isListening ? 'Voice Catching Active' : 'Microphone Inactive'}
+                  </span>
+                </div>
+              </div>
+
               <textarea
-                className="input-field"
-                rows={3}
-                placeholder="Click 'Capture Voice' to answer aloud (English / Hinglish), or type your explanation here..."
                 value={studentInput}
                 onChange={e => setStudentInput(e.target.value)}
-                style={{ resize: 'vertical' }}
+                placeholder="Speak naturally into your microphone (English or Hindi/Hinglish), or type here..."
+                rows={4}
+                className="input-field"
+                style={{ fontSize: '14px', lineHeight: '1.5', resize: 'vertical' }}
               />
+            </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Actions Bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={toggleVoiceCapture}
-                  className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
-                  style={{ flex: 1 }}
+                  onClick={() => handleTurnSubmit(false, true)}
+                  disabled={isSubmitting}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '12px', padding: '7px 14px' }}
                 >
-                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                  {isListening ? 'Stop Mic & Hold' : 'Capture Voice (Microphone)'}
+                  <HelpCircle size={14} color="var(--sun)" />
+                  Ask Socratic Hint
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleTurnSubmit()}
-                  disabled={isSubmitting || (!studentInput.trim() && !codeContent.trim())}
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  onClick={() => handleTurnSubmit(true, false)}
+                  disabled={isSubmitting}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '12px', padding: '7px 14px' }}
                 >
-                  <Send size={16} />
-                  {isSubmitting ? 'Processing Turn...' : 'Submit Spoken Answer'}
+                  <FastForward size={14} />
+                  Move to Next Topic
                 </button>
               </div>
 
-              {/* Quick Pedagogical Actions */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleTurnSubmit({ isHintReq: true })}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '12px', flex: 1, padding: '7px' }}
-                >
-                  <HelpCircle size={14} color="var(--amber)" />
-                  Request Socratic Hint
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleTurnSubmit({ isGiveup: true })}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '12px', flex: 1, padding: '7px' }}
-                >
-                  <FastForward size={14} color="var(--cyan)" />
-                  I Don't Know / Skip Topic
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleTurnSubmit(false, false)}
+                disabled={isSubmitting || (!studentInput.trim() && !codeContent.trim())}
+                className="btn btn-primary"
+                style={{ padding: '8px 24px', fontSize: '13px' }}
+              >
+                <Send size={14} />
+                {isSubmitting ? 'Evaluating...' : 'Submit Answer'}
+              </button>
             </div>
           </div>
-
-          {/* AI Webcam Proctoring Box */}
-          <WebcamProctor isActive={isStarted && !vivaCompleted} />
         </div>
 
-        {/* Middle Column (Optional Split): Interactive Code Whiteboard */}
+        {/* Center/Middle Column: Code Whiteboard (If Open) */}
         {showCodePad && (
-          <div style={{ height: '640px' }}>
+          <div>
             <CodeWhiteboard
               code={codeContent}
               onChange={setCodeContent}
+              onRunSimulation={(code) => {
+                setStudentInput(prev => prev ? `${prev}\n[Explained Code Solution]` : '[Explained Code Solution]');
+              }}
             />
           </div>
         )}
 
-        {/* Right Column: Live Timestamped Transcript Stream */}
+        {/* Right Column: Live Transcript Feed & Telemetry */}
         <div>
-          <div className="glass-panel" style={{ padding: '20px', height: '640px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: '700' }}>Live Auditable Transcript</h4>
-              <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                {transcriptFeed.length} Turns Logged
+          <div className="glass-panel" style={{ padding: '20px', background: '#FFFFFF', maxHeight: '720px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--rule)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={16} color="var(--nebula)" />
+                <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--ink)' }}>
+                  Auditable Viva Transcript
+                </span>
+              </div>
+              <span className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                {transcriptFeed.length} turns
               </span>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '6px' }}>
-              {transcriptFeed.map((item, idx) => (
-                <div key={idx} style={{
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  background: item.speaker === 'AI Examiner' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(6, 182, 212, 0.08)',
-                  borderLeft: `3px solid ${item.speaker === 'AI Examiner' ? 'var(--primary)' : 'var(--cyan)'}`
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: item.speaker === 'AI Examiner' ? 'var(--primary-light)' : 'var(--cyan)' }}>
-                      {item.speaker}
-                    </span>
-                    <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      {item.time}
-                    </span>
+            {/* Transcript Scroll Container */}
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {transcriptFeed.map((item, idx) => {
+                const isExaminer = item.speaker.includes('AI') || item.speaker.includes('Examiner');
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      background: isExaminer ? '#F8FAFC' : '#EEF2FF',
+                      border: `1px solid ${isExaminer ? 'var(--rule)' : 'rgba(99, 102, 241, 0.25)'}`,
+                      borderRadius: 'var(--radius-md)',
+                      padding: '14px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: 800, color: isExaminer ? 'var(--nebula)' : '#1E1B4B' }}>
+                        {item.speaker}
+                      </span>
+                      <span className="mono" style={{ fontSize: '10px', color: 'var(--muted)' }}>
+                        {item.time}
+                      </span>
+                    </div>
+                    <p style={{ color: 'var(--ink)', lineHeight: '1.45', margin: 0 }}>
+                      {item.text}
+                    </p>
+                    {item.codeSnippet && (
+                      <pre style={{
+                        marginTop: '8px',
+                        background: '#0B0F19',
+                        color: '#E2E8F0',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        overflowX: 'auto'
+                      }}>
+                        <code>{item.codeSnippet}</code>
+                      </pre>
+                    )}
                   </div>
-
-                  <p style={{ fontSize: '13px', lineHeight: '1.5', color: '#e2e8f0', marginBottom: item.codeSnippet ? '8px' : '0' }}>
-                    {item.text}
-                  </p>
-
-                  {/* If candidate submitted code */}
-                  {item.codeSnippet && (
-                    <div style={{
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      padding: '8px',
-                      borderRadius: '6px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '11px',
-                      color: '#38bdf8',
-                      overflowX: 'auto',
-                      whiteSpace: 'pre-wrap'
-                    }}>
-                      {item.codeSnippet}
-                    </div>
-                  )}
-
-                  {/* Acoustic telemetry badges */}
-                  {item.speaker !== 'AI Examiner' && item.wpm && (
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '10px', color: 'var(--text-dim)' }}>
-                      <span>⚡ {item.wpm} WPM</span>
-                      <span>• Fillers: {item.fillers}</span>
-                      <span>• Fluency: {item.fluency}%</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Settings Modal */}
+      {/* Voice Settings & Scorecard Modals */}
       <VoiceSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -1040,14 +1053,13 @@ export default function StudentPortal() {
         onChangeSpeechRate={setSpeechRate}
       />
 
-      {/* Scorecard Modal on Completion */}
       <ScorecardModal
         isOpen={isScorecardOpen}
         onClose={() => setIsScorecardOpen(false)}
         result={completionResult}
         studentName={studentName}
         studentId={studentId}
-        subjectTitle={subjectDomain}
+        subjectTitle={selectedDomain === 'webdev' ? 'CS304: Modern Web Development' : 'CS302: Data Structures & Algorithms'}
       />
     </div>
   );

@@ -40,14 +40,14 @@ export default function StarfieldSky() {
         star.phase += star.speed;
         const currentAlpha = Math.max(0.1, star.alpha + Math.sin(star.phase) * 0.35);
 
-        ctx.fillStyle = `rgba(238, 236, 255, ${currentAlpha})`;
+        ctx.fillStyle = `rgba(99, 102, 241, ${currentAlpha * 0.45})`;
         ctx.beginPath();
         ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
         ctx.fill();
 
         // Subtle cross flare on brightest stars
         if (star.size > 1.4 && currentAlpha > 0.6) {
-          ctx.strokeStyle = `rgba(95, 216, 255, ${currentAlpha * 0.4})`;
+          ctx.strokeStyle = `rgba(79, 70, 229, ${currentAlpha * 0.3})`;
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.moveTo(star.x - 3, star.y);

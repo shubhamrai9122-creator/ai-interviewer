@@ -22,37 +22,51 @@ HESITATION_PHRASES = [
     "might be wrong", "could be", "i don't recall exactly"
 ]
 
-# Examiner Personas
+# Examiner Personas (Strictly Sweet, Young Female Voices - No Male Voices)
 EXAMINER_PERSONAS = {
+    "grok_sweet": {
+        "id": "grok_sweet",
+        "name": "Grok Sweet AI",
+        "title": "Sweet & Youthful AI Examiner",
+        "style": "Bright, melodic, playful, enthusiastic young female tone",
+        "voice_gender": "female",
+        "pitch": 1.22,
+        "rate": 0.98,
+        "avatar_badge": "✨ Grok Sweet Voice",
+        "preview_phrase": "Hi! I'm your Grok AI interviewer. Let's explore your DSA and Web Development expertise together!"
+    },
     "aria": {
         "id": "aria",
-        "name": "Aria",
-        "title": "Sweet & Friendly AI Interviewer",
-        "style": "Sweet, warm, encouraging, gentle cadence",
+        "name": "Aria Sweet",
+        "title": "Warm & Gentle Young AI Interviewer",
+        "style": "Sweet, warm, encouraging, velvety crystal cadence",
         "voice_gender": "female",
-        "pitch": 1.12,
+        "pitch": 1.18,
         "rate": 0.95,
-        "avatar_badge": "🌸 Sweet AI Voice"
+        "avatar_badge": "🌸 Aria Sweet Voice",
+        "preview_phrase": "Hello! I'm Aria. Take a gentle breath, and let's have a wonderful technical viva."
     },
-    "priya": {
-        "id": "priya",
-        "name": "Prof. Priya Nair",
-        "title": "Empathetic Socratic Mentor",
-        "style": "Supportive, concept-grounding, patient",
+    "maya": {
+        "id": "maya",
+        "name": "Maya Young Lead",
+        "title": "Youthful Full-Stack Tech Lead",
+        "style": "Crisp, cheerful, articulate young female engineer",
         "voice_gender": "female",
-        "pitch": 1.05,
-        "rate": 0.96,
-        "avatar_badge": "🌱 Socratic Mentor"
+        "pitch": 1.15,
+        "rate": 0.97,
+        "avatar_badge": "⚡ Maya Young Lead",
+        "preview_phrase": "Hey there! Ready to dive into some exciting data structures and web development systems?"
     },
-    "eleanor": {
-        "id": "eleanor",
-        "name": "Dr. Eleanor Vance",
-        "title": "Principal Academic Examiner",
-        "style": "Structured, deep-reasoning, academic",
+    "zara": {
+        "id": "zara",
+        "name": "Zara Socratic",
+        "title": "Sweet Socratic Guide",
+        "style": "Gentle, patient, supportive sweet tone",
         "voice_gender": "female",
-        "pitch": 1.0,
-        "rate": 0.98,
-        "avatar_badge": "🎓 Academic Lead"
+        "pitch": 1.16,
+        "rate": 0.94,
+        "avatar_badge": "💎 Zara Socratic Guide",
+        "preview_phrase": "Welcome! Whenever you are ready, let's explore your technical reasoning step by step."
     }
 }
 
@@ -308,6 +322,212 @@ class VoiceService:
         })
 
         return questions
+
+    def generate_syllabus_topic_trees(self, syllabus_text: str, subject_domain: str = "DSA", difficulty: str = "Medium") -> List[Dict[str, Any]]:
+        """
+        Parses faculty uploaded syllabus / documents and builds full hierarchical Question Trees:
+        Topic -> Root Question -> Followup 1 (CORRECT) -> Followup 2 (STRONG) -> Socratic Hint (PARTIAL).
+        Tailored strictly for Data Structures & Algorithms (DSA) or Web Development.
+        """
+        text_lower = syllabus_text.lower()
+        is_web_dev = "web" in text_lower or "react" in text_lower or "frontend" in text_lower or "backend" in text_lower or "node" in text_lower or "http" in text_lower or "sql" in text_lower or subject_domain.lower() == "web development"
+
+        if is_web_dev:
+            # Web Development Topic Trees
+            trees = [
+                {
+                    "topic_name": "Frontend Architecture & Virtual DOM",
+                    "root": {
+                        "question_text": "Explain how React's Virtual DOM diffing (Reconciliation / Fiber) operates and when reconciliation causes performance bottlenecks.",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["virtual dom", "reconciliation", "fiber tree", "diffing algorithm", "render cycle"],
+                        "answer_key": "React compares virtual DOM trees in memory to compute minimal mutations to the real browser DOM via heuristic O(N) diffing."
+                    },
+                    "followup_1": {
+                        "question_text": "How does React manage keys in lists during reconciliation, and what bug occurs if you use array indices as keys when items are reordered or filtered?",
+                        "difficulty": 3,
+                        "question_type": "WHY",
+                        "expected_concepts": ["key prop", "component state retention", "index as key", "re-order bug", "uncontrolled inputs"],
+                        "answer_key": "Using indices as keys tricks React into associating stale state with mismatched DOM nodes when list elements are prepended or filtered."
+                    },
+                    "followup_2": {
+                        "question_text": "Compare React Server Components (RSC) with traditional Client-Side Hydration. How do Server Components eliminate client bundle bloat while streaming HTML?",
+                        "difficulty": 4,
+                        "question_type": "TRADE_OFF",
+                        "expected_concepts": ["server components", "zero client bundle", "streaming html", "hydration mismatch", "suspense"],
+                        "answer_key": "RSC execute exclusively on the server, streaming JSON representations directly into the DOM tree without sending heavy libraries to the client browser."
+                    },
+                    "hint": {
+                        "question_text": "Think about how React calculates changes between two object trees before touching the actual real browser DOM.",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["virtual dom", "batching"],
+                        "answer_key": "React batches updates in a lightweight memory representation called the Virtual DOM."
+                    }
+                },
+                {
+                    "topic_name": "Backend APIs, WebSockets & Event Loop",
+                    "root": {
+                        "question_text": "How does the Node.js Event Loop process microtasks versus macrotasks? Trace the execution order of process.nextTick, Promise.resolve, setTimeout, and setImmediate.",
+                        "difficulty": 3,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["event loop", "microtask queue", "macrotask queue", "process.nextTick", "call stack"],
+                        "answer_key": "Microtasks (process.nextTick, resolved promises) drain fully before the event loop advances to timers or IO phases."
+                    },
+                    "followup_1": {
+                        "question_text": "In a RESTful architecture, why are idempotency keys critical for POST payment or order creation, and how do you implement them using Redis distributed locks?",
+                        "difficulty": 3,
+                        "question_type": "APPLIED",
+                        "expected_concepts": ["idempotency key", "retry storm", "redis lock", "atomic transaction", "at-least-once"],
+                        "answer_key": "Clients send an Idempotency-Key header. The server acquires a lock in Redis and caches the response, preventing duplicate card charges."
+                    },
+                    "followup_2": {
+                        "question_text": "Contrast HTTP/1.1 keep-alive, HTTP/2 multiplexing, and WebSockets. For a live multiplayer canvas or chat app, why do WebSockets outperform HTTP long-polling?",
+                        "difficulty": 4,
+                        "question_type": "TRADE_OFF",
+                        "expected_concepts": ["full-duplex", "framing", "handshake overhead", "multiplexing", "head-of-line blocking"],
+                        "answer_key": "WebSockets upgrade an HTTP connection into a persistent, bi-directional, full-duplex TCP stream with 2-byte framing overhead."
+                    },
+                    "hint": {
+                        "question_text": "Remember that JavaScript is single-threaded. What queue takes absolute priority immediately after the current synchronous function finishes?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["microtask", "promise"],
+                        "answer_key": "The microtask queue executes immediately after the current call stack clears."
+                    }
+                },
+                {
+                    "topic_name": "Databases, Indexing & Storage Systems",
+                    "root": {
+                        "question_text": "Explain the difference between clustered and non-clustered indexes in SQL databases. Why does a query with SELECT * WHERE non_indexed_column = X trigger a full table scan?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["clustered index", "non-clustered index", "b-tree", "table scan", "leaf nodes"],
+                        "answer_key": "A clustered index defines physical row order on disk; non-clustered indexes store pointers to row locators."
+                    },
+                    "followup_1": {
+                        "question_text": "What are the 4 ACID properties in transactional databases, and what is the difference between Read Committed and Serializable isolation levels?",
+                        "difficulty": 3,
+                        "question_type": "WHY",
+                        "expected_concepts": ["atomicity", "consistency", "isolation", "durability", "phantom reads", "write skew"],
+                        "answer_key": "Read Committed avoids dirty reads by reading committed data; Serializable enforces execution order equivalent to sequential transactions."
+                    },
+                    "followup_2": {
+                        "question_text": "When designing a high-write notification feed, when would you choose an append-only NoSQL document or wide-column store over a normalized relational schema?",
+                        "difficulty": 4,
+                        "question_type": "TRADE_OFF",
+                        "expected_concepts": ["horizontal partitioning", "sharding", "lsm-tree", "write amplification", "eventual consistency"],
+                        "answer_key": "Append-only storage uses sequential disk writes (LSM-trees) without relational joins, achieving sub-millisecond write ingestion."
+                    },
+                    "hint": {
+                        "question_text": "Think of a textbook: what is the difference between the physical order of chapters versus the index at the back?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["physical ordering", "b-tree pointer"],
+                        "answer_key": "Clustered index is the book itself, non-clustered index is the reference glossary pointing to page numbers."
+                    }
+                }
+            ]
+        else:
+            # Data Structures & Algorithms (DSA) Topic Trees
+            trees = [
+                {
+                    "topic_name": "Arrays & Hash Maps",
+                    "root": {
+                        "question_text": "How does a Hash Map achieve average O(1) time complexity for insertions and lookups, and what causes it to degrade?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["hash function", "collision", "chaining", "load factor", "O(N) worst case"],
+                        "answer_key": "Hash function computes index from key. Average O(1). Collisions handled by chaining or open addressing."
+                    },
+                    "followup_1": {
+                        "question_text": "Why does dynamic array resizing take amortized O(1) time instead of O(N) on every append?",
+                        "difficulty": 3,
+                        "question_type": "WHY",
+                        "expected_concepts": ["geometric doubling", "amortized", "aggregate method", "capacity"],
+                        "answer_key": "Resizing doubles capacity (2x), meaning copy operations happen exponentially less frequently."
+                    },
+                    "followup_2": {
+                        "question_text": "What happens if a hash function distributes all keys into a single bucket? How does Java 8+ HashMap mitigate Hash-DoS using Red-Black trees?",
+                        "difficulty": 4,
+                        "question_type": "EDGE_CASE",
+                        "expected_concepts": ["degenerate linked list", "treeify", "red-black tree", "hash dos attack"],
+                        "answer_key": "When bucket size exceeds 8, the bucket converts to a Red-Black Tree, bounding worst-case search to O(log N)."
+                    },
+                    "hint": {
+                        "question_text": "If two different keys compute to the exact same hash index, how does separate chaining link and search both values?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["linked list", "bucket", "collision chaining"],
+                        "answer_key": "Chaining stores elements sharing the same hash index in a linked list or bucket chain."
+                    }
+                },
+                {
+                    "topic_name": "Trees & Graphs",
+                    "root": {
+                        "question_text": "Explain the invariants of a Binary Search Tree (BST) and how searching works.",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["left subtree smaller", "right subtree greater", "O(log N)", "binary search"],
+                        "answer_key": "For every node, all left descendants are smaller, all right descendants are greater. Search compares and goes left or right."
+                    },
+                    "followup_1": {
+                        "question_text": "Why does a standard BST degenerate into O(N) worst-case time, and how does an AVL tree prevent this using rotations?",
+                        "difficulty": 4,
+                        "question_type": "WHY",
+                        "expected_concepts": ["skewed tree", "sorted insertion", "balance factor", "rotations", "height balance"],
+                        "answer_key": "Inserting sorted keys makes a skewed linked-list tree. AVL tracks balance factor (-1, 0, +1) and performs single or double rotations to preserve O(log N) height."
+                    },
+                    "followup_2": {
+                        "question_text": "In a directed graph, how would you detect a cycle? Contrast DFS with Kahn's topological sort algorithm.",
+                        "difficulty": 4,
+                        "question_type": "TRADE_OFF",
+                        "expected_concepts": ["back edge", "recursion stack", "indegree", "topological sort", "kahn algorithm"],
+                        "answer_key": "DFS uses recursion stack to find back-edges. Kahn's uses BFS with indegrees; if processed < total nodes, cycle exists."
+                    },
+                    "hint": {
+                        "question_text": "In a BST, if you are looking for a target value greater than the current node's value, which direction do you branch?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["right child", "greater"],
+                        "answer_key": "You always traverse into the right child since all values in the right subtree are greater."
+                    }
+                },
+                {
+                    "topic_name": "Dynamic Programming & Optimization",
+                    "root": {
+                        "question_text": "What are the two fundamental properties required to solve a problem with Dynamic Programming? Contrast memoization with tabulation.",
+                        "difficulty": 3,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["optimal substructure", "overlapping subproblems", "memoization", "tabulation", "top-down vs bottom-up"],
+                        "answer_key": "Optimal substructure and overlapping subproblems. Memoization is top-down with recursion; tabulation is bottom-up iterative."
+                    },
+                    "followup_1": {
+                        "question_text": "In the 0/1 Knapsack problem, why can't we solve it with a greedy approach like we can with the Fractional Knapsack?",
+                        "difficulty": 3,
+                        "question_type": "WHY",
+                        "expected_concepts": ["indivisible items", "greedy choice fails", "combinatorial search", "value density"],
+                        "answer_key": "Items cannot be split; taking the highest ratio item might leave unused capacity that yields lower total value than alternative combinations."
+                    },
+                    "followup_2": {
+                        "question_text": "How can the 2D DP array in the 0/1 Knapsack or Longest Common Subsequence be space-optimized from O(N * W) to O(W)?",
+                        "difficulty": 4,
+                        "question_type": "EDGE_CASE",
+                        "expected_concepts": ["space optimization", "rolling array", "1d array backwards traversal", "cache locality"],
+                        "answer_key": "Since state dp[i][w] only depends on previous row dp[i-1], we can maintain a single 1D array traversed backwards from capacity W down to 0."
+                    },
+                    "hint": {
+                        "question_text": "If you already computed the answer for Fibonacci(10), why recompute it when solving Fibonacci(11)? What is that called?",
+                        "difficulty": 2,
+                        "question_type": "CONCEPT",
+                        "expected_concepts": ["memoization", "cache"],
+                        "answer_key": "Storing previously computed subproblems in a cache is called memoization."
+                    }
+                }
+            ]
+
+        return trees
 
     def ingest_project_and_generate_probes(
         self,

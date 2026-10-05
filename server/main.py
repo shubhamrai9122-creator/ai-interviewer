@@ -17,7 +17,8 @@ from server.models import (
     StudentStartRequest, StudentTurnRequest, OverrideRequest, IntegrityEventRequest,
     ContextQuestionGenRequest, VoiceAcousticsRequest,
     VivaDurationUpdateRequest, QuestionTreeNodeCreate,
-    ProjectIngestRequest, ProjectVerdictRequest
+    ProjectIngestRequest, ProjectVerdictRequest,
+    SyllabusTreeUploadRequest
 )
 from server.viva_engine import VivaEngine
 from server.scoring_worker import ScoringWorker
@@ -245,6 +246,137 @@ def generate_questions_from_context(req: ContextQuestionGenRequest, db: Session 
         "role_title": req.role_title,
         "questions": created,
         "message": f"Successfully synthesized {len(created)} questions from provided background."
+    }
+
+@app.post("/api/faculty/syllabus-to-tree")
+def generate_tree_from_syllabus(req: SyllabusTreeUploadRequest, db: Session = Depends(get_db)):
+    """
+    Faculty Panel: Parses uploaded syllabus/doc text, creates Topics,
+    and builds an approved hierarchical Question Tree (Root -> Follow-up 1 -> Follow-up 2 -> Hint).
+    Strictly for DSA or Web Development.
+    """
+    # Find matching viva by ID or Subject
+    viva = None
+    if req.viva_id:
+        viva = db.query(Viva).filter(Viva.id == req.viva_id).first()
+    if not viva:
+        subject_sub = "Web" if "web" in req.subject.lower() else "Data"
+        viva = db.query(Viva).filter(Viva.subject.contains(subject_sub)).first()
+    if not viva:
+        viva = db.query(Viva).first()
+
+    trees = voice_service.generate_syllabus_topic_trees(
+        syllabus_text=req.syllabus_text,
+        subject_domain=req.subject,
+        difficulty=req.difficulty
+    )
+
+    created_trees_summary = []
+
+    for t_data in trees:
+        topic_name = t_data.get("topic_name", "Core Topic")
+        topic = Topic(viva_id=viva.id, name=topic_name, weight=1.0)
+        db.add(topic)
+        db.commit()
+        db.refresh(topic)
+
+        # 1. Root Question (Depth 1)
+        r_info = t_data.get("root", {})
+        q_root = Question(
+            viva_id=viva.id,
+            topic_id=topic.id,
+            question_text=r_info.get("question_text", "Explain core concept."),
+            question_type=QuestionType(r_info.get("question_type", "CONCEPT")),
+            difficulty=r_info.get("difficulty", 2),
+            expected_concepts=r_info.get("expected_concepts", []),
+            answer_key=r_info.get("answer_key", ""),
+            tree_depth=1,
+            branch_condition="ROOT",
+            is_terminal=False,
+            status="APPROVED",
+            source="FACULTY_SYLLABUS"
+        )
+        db.add(q_root)
+        db.commit()
+        db.refresh(q_root)
+
+        # 2. Follow-up 1 (Depth 2, Branch: CORRECT)
+        f1_info = t_data.get("followup_1", {})
+        q_f1 = Question(
+            viva_id=viva.id,
+            topic_id=topic.id,
+            parent_question_id=q_root.id,
+            question_text=f1_info.get("question_text", "Explain why."),
+            question_type=QuestionType(f1_info.get("question_type", "WHY")),
+            difficulty=f1_info.get("difficulty", 3),
+            expected_concepts=f1_info.get("expected_concepts", []),
+            answer_key=f1_info.get("answer_key", ""),
+            tree_depth=2,
+            branch_condition="CORRECT",
+            is_terminal=False,
+            status="APPROVED",
+            source="FACULTY_SYLLABUS"
+        )
+        db.add(q_f1)
+        db.commit()
+        db.refresh(q_f1)
+
+        # 3. Follow-up 2 (Depth 3, Branch: STRONG)
+        f2_info = t_data.get("followup_2", {})
+        q_f2 = Question(
+            viva_id=viva.id,
+            topic_id=topic.id,
+            parent_question_id=q_f1.id,
+            question_text=f2_info.get("question_text", "Explain trade-offs."),
+            question_type=QuestionType(f2_info.get("question_type", "TRADE_OFF")),
+            difficulty=f2_info.get("difficulty", 4),
+            expected_concepts=f2_info.get("expected_concepts", []),
+            answer_key=f2_info.get("answer_key", ""),
+            tree_depth=3,
+            branch_condition="STRONG",
+            is_terminal=True,
+            status="APPROVED",
+            source="FACULTY_SYLLABUS"
+        )
+        db.add(q_f2)
+
+        # 4. Socratic Hint / Simpler bridge (Depth 2, Branch: PARTIAL)
+        h_info = t_data.get("hint", {})
+        q_hint = Question(
+            viva_id=viva.id,
+            topic_id=topic.id,
+            parent_question_id=q_root.id,
+            question_text=h_info.get("question_text", "Think about the basics."),
+            question_type=QuestionType(h_info.get("question_type", "CONCEPT")),
+            difficulty=h_info.get("difficulty", 2),
+            expected_concepts=h_info.get("expected_concepts", []),
+            answer_key=h_info.get("answer_key", ""),
+            tree_depth=2,
+            branch_condition="PARTIAL",
+            is_terminal=True,
+            status="APPROVED",
+            source="FACULTY_SYLLABUS"
+        )
+        db.add(q_hint)
+        db.commit()
+
+        created_trees_summary.append({
+            "topic_id": topic.id,
+            "topic_name": topic.name,
+            "root_question": q_root.question_text,
+            "followup_1": q_f1.question_text,
+            "followup_2": q_f2.question_text,
+            "hint": q_hint.question_text
+        })
+
+    return {
+        "status": "success",
+        "viva_id": viva.id,
+        "viva_title": viva.title,
+        "subject": req.subject,
+        "topics_created": len(created_trees_summary),
+        "trees": created_trees_summary,
+        "message": f"Successfully synthesized {len(created_trees_summary)} adaptive Question Trees into {viva.title}!"
     }
 
 # --- Authentication & Users ---

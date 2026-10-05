@@ -7,9 +7,150 @@ from server.models import (
 )
 
 def seed_database(db: Session):
-    # Check if already seeded
-    if db.query(Viva).filter(Viva.id == 42).first():
-        return
+    # Check if Viva 42 is seeded
+    if not db.query(Viva).filter(Viva.id == 42).first():
+        seed_dsa_viva(db)
+    
+    # Check if Viva 43 (Web Development) is seeded
+    if not db.query(Viva).filter(Viva.id == 43).first():
+        seed_web_dev_viva(db)
+
+def seed_web_dev_viva(db: Session):
+    print("Seeding Web Development Viva #43...")
+    viva_web = Viva(
+        id=43,
+        title="CS304: Modern Web Development & Full-Stack Systems Viva",
+        subject="Web Development",
+        difficulty="Medium",
+        duration_minutes=15,
+        status=VivaStatus.ACTIVE,
+        created_by="Dr. Meenakshi Verma",
+        rubric_config={
+            "conceptual_understanding": 0.30,
+            "depth_and_reasoning": 0.25,
+            "problem_solving": 0.20,
+            "practical_project": 0.15,
+            "communication": 0.10
+        }
+    )
+    db.add(viva_web)
+    db.commit()
+
+    # Topics for Web Dev
+    t_frontend = Topic(viva_id=43, name="Frontend Architecture & Virtual DOM", weight=1.0)
+    t_backend = Topic(viva_id=43, name="Backend APIs, WebSockets & Event Loop", weight=1.2)
+    t_db = Topic(viva_id=43, name="Databases, Indexing & Storage Systems", weight=1.0)
+    t_sec = Topic(viva_id=43, name="Web Security & Performance Optimization", weight=1.0)
+    db.add_all([t_frontend, t_backend, t_db, t_sec])
+    db.commit()
+
+    # Topic 1: Frontend Architecture
+    qw1 = Question(
+        viva_id=43, topic_id=t_frontend.id,
+        question_text="Explain how React's Virtual DOM diffing (Reconciliation / Fiber) operates and when reconciliation causes performance bottlenecks.",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["virtual dom", "reconciliation", "fiber tree", "diffing algorithm", "render cycle"],
+        answer_key="React compares virtual DOM trees in memory to compute minimal mutations to the real browser DOM via heuristic O(N) diffing.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(qw1)
+    db.commit()
+    db.refresh(qw1)
+
+    qw2 = Question(
+        viva_id=43, topic_id=t_frontend.id, parent_question_id=qw1.id,
+        question_text="How does React manage keys in lists during reconciliation, and what bug occurs if you use array indices as keys when items are reordered or filtered?",
+        question_type=QuestionType.WHY, difficulty=3,
+        expected_concepts=["key prop", "component state retention", "index as key", "re-order bug", "uncontrolled inputs"],
+        answer_key="Using indices as keys tricks React into associating stale state with mismatched DOM nodes when list elements are prepended or filtered.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=False
+    )
+    qw_hint1 = Question(
+        viva_id=43, topic_id=t_frontend.id, parent_question_id=qw1.id,
+        question_text="Think about how React calculates changes between two object trees before touching the actual real browser DOM.",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["virtual dom", "batching"],
+        answer_key="React batches updates in a lightweight memory representation called the Virtual DOM.",
+        tree_depth=2, branch_condition="PARTIAL", is_terminal=True
+    )
+    db.add_all([qw2, qw_hint1])
+    db.commit()
+    db.refresh(qw2)
+
+    qw3 = Question(
+        viva_id=43, topic_id=t_frontend.id, parent_question_id=qw2.id,
+        question_text="Compare React Server Components (RSC) with traditional Client-Side Hydration. How do Server Components eliminate client bundle bloat while streaming HTML?",
+        question_type=QuestionType.TRADE_OFF, difficulty=4,
+        expected_concepts=["server components", "zero client bundle", "streaming html", "hydration mismatch", "suspense"],
+        answer_key="RSC execute exclusively on the server, streaming JSON representations directly into the DOM tree without sending heavy libraries to the client browser.",
+        tree_depth=3, branch_condition="STRONG", is_terminal=True
+    )
+    db.add(qw3)
+    db.commit()
+
+    # Topic 2: Backend APIs, WebSockets & Event Loop
+    qw4 = Question(
+        viva_id=43, topic_id=t_backend.id,
+        question_text="How does the Node.js Event Loop process microtasks versus macrotasks? Trace the execution order of process.nextTick, Promise.resolve, setTimeout, and setImmediate.",
+        question_type=QuestionType.CONCEPT, difficulty=3,
+        expected_concepts=["event loop", "microtask queue", "macrotask queue", "process.nextTick", "call stack"],
+        answer_key="Microtasks (process.nextTick, resolved promises) drain fully before the event loop advances to timers or IO phases.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(qw4)
+    db.commit()
+    db.refresh(qw4)
+
+    qw5 = Question(
+        viva_id=43, topic_id=t_backend.id, parent_question_id=qw4.id,
+        question_text="In a RESTful architecture, why are idempotency keys critical for POST payment or order creation, and how do you implement them using Redis distributed locks?",
+        question_type=QuestionType.APPLIED, difficulty=3,
+        expected_concepts=["idempotency key", "retry storm", "redis lock", "atomic transaction", "at-least-once"],
+        answer_key="Clients send an Idempotency-Key header. The server acquires a lock in Redis and caches the response, preventing duplicate card charges.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=False
+    )
+    db.add(qw5)
+    db.commit()
+    db.refresh(qw5)
+
+    qw6 = Question(
+        viva_id=43, topic_id=t_backend.id, parent_question_id=qw5.id,
+        question_text="Contrast HTTP/1.1 keep-alive, HTTP/2 multiplexing, and WebSockets. For a live multiplayer canvas or chat app, why do WebSockets outperform HTTP long-polling?",
+        question_type=QuestionType.TRADE_OFF, difficulty=4,
+        expected_concepts=["full-duplex", "framing", "handshake overhead", "multiplexing", "head-of-line blocking"],
+        answer_key="WebSockets upgrade an HTTP connection into a persistent, bi-directional, full-duplex TCP stream with 2-byte framing overhead.",
+        tree_depth=3, branch_condition="STRONG", is_terminal=True
+    )
+    db.add(qw6)
+    db.commit()
+
+    # Topic 3: Databases
+    qw7 = Question(
+        viva_id=43, topic_id=t_db.id,
+        question_text="Explain the difference between clustered and non-clustered indexes in SQL databases. Why does a query with SELECT * WHERE non_indexed_column = X trigger a full table scan?",
+        question_type=QuestionType.CONCEPT, difficulty=2,
+        expected_concepts=["clustered index", "non-clustered index", "b-tree", "table scan", "leaf nodes"],
+        answer_key="A clustered index defines physical row order on disk; non-clustered indexes store pointers to row locators.",
+        tree_depth=1, branch_condition="ROOT", is_terminal=False
+    )
+    db.add(qw7)
+    db.commit()
+    db.refresh(qw7)
+
+    qw8 = Question(
+        viva_id=43, topic_id=t_db.id, parent_question_id=qw7.id,
+        question_text="What are the 4 ACID properties in transactional databases, and what is the difference between Read Committed and Serializable isolation levels?",
+        question_type=QuestionType.WHY, difficulty=3,
+        expected_concepts=["atomicity", "consistency", "isolation", "durability", "phantom reads", "write skew"],
+        answer_key="Read Committed avoids dirty reads by reading committed data; Serializable enforces execution order equivalent to sequential transactions.",
+        tree_depth=2, branch_condition="CORRECT", is_terminal=True
+    )
+    db.add(qw8)
+    db.commit()
+
+    print("Web Development Viva #43 successfully seeded!")
+
+def seed_dsa_viva(db: Session):
 
     print("Seeding initial AI Viva database...")
 
