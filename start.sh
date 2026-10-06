@@ -8,6 +8,10 @@ echo "=========================================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+if [ -d "$SCRIPT_DIR/.node/bin" ]; then
+    export PATH="$SCRIPT_DIR/.node/bin:$PATH"
+fi
+
 # 1. Python Environment Check
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
