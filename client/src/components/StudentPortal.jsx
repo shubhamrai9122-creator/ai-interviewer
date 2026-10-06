@@ -9,6 +9,7 @@ import AudioVisualizer from './AudioVisualizer';
 import HackerRankCodeEditor from './HackerRankCodeEditor';
 import ScreenAndCameraRecorder from './ScreenAndCameraRecorder';
 import SolarSystem3D from './SolarSystem3D';
+import SingularityWarp from './SingularityWarp';
 import ScorecardModal from './ScorecardModal';
 import { AudioCaptureEngine, analyzeSpokenText } from '../utils/audioCapture';
 
@@ -20,6 +21,7 @@ export default function StudentPortal() {
   const [rollNumber, setRollNumber] = useState('21BCSE104');
   const [studentName, setStudentName] = useState('Rahul Sharma');
   const [consentGiven, setConsentGiven] = useState(false);
+  const [isWarping, setIsWarping] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
   const [sessionId, setSessionId] = useState(null);
 
@@ -224,12 +226,15 @@ export default function StudentPortal() {
     }
   };
 
-  // Start Viva Session (AI INTERVIEW START)
+  // Start Viva Session (Trigger Singularity Cosmic Warp Animation from rishiraj38.github.io)
   const handleStartViva = async () => {
     if (!consentGiven) {
       alert('Please check the consent box to proceed.');
       return;
     }
+
+    // Launch the Singularity & Celestial Solar Collapse animation overlay
+    setIsWarping(true);
 
     const vivaId = selectedDomain === 'webdev' ? 43 : 42;
     const domainTitle = selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms';
@@ -253,7 +258,6 @@ export default function StudentPortal() {
       setAiQuestion(data.first_question);
       setCurrentPhase(data.phase);
       setQuestionType(data.question_type);
-      setIsStarted(true);
       setCurrentStep(1); // Step 1: Introduction
 
       setTranscriptFeed([
@@ -265,11 +269,20 @@ export default function StudentPortal() {
         }
       ]);
 
-      speakText(data.first_question);
-      await setupAudioCapture();
+      // When the Singularity animation completes, onWarpComplete will trigger speech and audio capture
     } catch (err) {
+      setIsWarping(false);
       alert('Failed to initialize viva session: ' + err.message);
     }
+  };
+
+  const handleWarpComplete = async () => {
+    setIsWarping(false);
+    setIsStarted(true);
+    if (aiQuestion) {
+      speakText(aiQuestion);
+    }
+    await setupAudioCapture();
   };
 
   // Submit Answer Turn
@@ -612,6 +625,9 @@ export default function StudentPortal() {
           </div>
           <SolarSystem3D height="440px" />
         </div>
+
+        {/* Singularity Cosmic Black Hole Warp Transition from rishiraj38.github.io */}
+        {isWarping && <SingularityWarp onComplete={handleWarpComplete} />}
       </div>
     );
   }
