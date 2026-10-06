@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from server.models import (
     User, UserRole, Viva, VivaStatus, Topic, Question, QuestionType,
     VivaSession, SessionStatus, SessionPhase, QuestionAsked, StudentAnswer,
-    VivaScore, ScoreEvidence, FacultyOverride, IntegrityLog, AnswerQuality, FollowupAction
+    VivaScore, ScoreEvidence, FacultyOverride, IntegrityLog, AnswerQuality, FollowupAction,
+    TrainedSyllabus
 )
 
 def seed_database(db: Session):
@@ -14,6 +15,77 @@ def seed_database(db: Session):
     # Check if Viva 43 (Web Development) is seeded
     if not db.query(Viva).filter(Viva.id == 43).first():
         seed_web_dev_viva(db)
+
+    # Check if Trained Syllabi are seeded
+    if not db.query(TrainedSyllabus).first():
+        seed_trained_syllabi(db)
+
+def seed_trained_syllabi(db: Session):
+    print("Seeding Internshala Master Syllabi...")
+    s1 = TrainedSyllabus(
+        title="Internshala Core SDE Track (DSA)",
+        subject="Data Structures & Algorithms",
+        target_role="Software Development Engineer (SDE) Intern",
+        syllabus_text="Arrays, Two Pointers, Sliding Window, Prefix Sum, Binary Search, Linked Lists, Binary Trees, Graph BFS/DFS, Dynamic Programming Tabulation.",
+        topics_extracted=["Two Pointers & Sliding Window", "Binary Search", "Trees & BST", "Dynamic Programming", "Graphs, BFS & DFS"],
+        key_concepts=["sliding window", "two pointer", "hash map", "binary search", "recursion", "memoization"],
+        generated_questions=[
+            {
+                "title": "Longest Substring Without Repeating Characters",
+                "topic": "Sliding Window & Two Pointers",
+                "level": "Intermediate",
+                "statement": "Given a string s, find the length of the longest substring without repeating characters.",
+                "input_desc": "s: str",
+                "output_desc": "int: Length of longest unique substring",
+                "constraints": "- 0 <= s.length <= 5 * 10^4\n- s consists of English letters, digits, symbols and spaces.",
+                "examples": "Example 1:\nInput: s = 'abcabcbb'\nOutput: 3 (Explanation: 'abc')",
+                "expected_concepts": ["sliding window", "two pointer", "hash set", "hash map", "O(N) time"],
+                "hints": [
+                    "Think about maintaining a contiguous window of characters as you scan left to right.",
+                    "Can you use the Two Pointers or Sliding Window pattern with a hash map to track characters?",
+                    "Use two pointers, left and right. Expand right to include characters, and shrink left when duplicates occur.",
+                    "Store last seen indices in a map: seen[char] = right. When duplicate appears, advance left = max(left, seen[char] + 1)."
+                ],
+                "follow_up": "How would you optimize this if the character set is strictly limited to 26 lowercase English letters?"
+            }
+        ],
+        is_active=True,
+        created_at=time.time()
+    )
+
+    s2 = TrainedSyllabus(
+        title="Internshala Full-Stack Web Development Track",
+        subject="Web Development",
+        target_role="Full-Stack Developer Intern",
+        syllabus_text="HTML/CSS, Modern JavaScript, React Reconciliation, Fiber, Hooks, Node.js Event Loop, Express.js Middleware, REST APIs, JWT Authentication, Cookies, MongoDB.",
+        topics_extracted=["Frontend & React", "Backend & Node.js/Express", "Authentication & Security", "Databases & Storage"],
+        key_concepts=["virtual dom", "event loop", "jwt", "express middleware", "httponly cookie", "indexing"],
+        generated_questions=[
+            {
+                "title": "Secure Full-Stack JWT Authentication Architecture",
+                "topic": "Web Security & Full-Stack Systems",
+                "level": "Intermediate",
+                "statement": "Suppose you have a React frontend and Express backend. Explain how you would implement authentication using JWT. Where would you store the token, how would the server verify it, and what security concerns would you consider?",
+                "input_desc": "React Client + Express REST Server + Database",
+                "output_desc": "Full authentication flow and security mitigation explanation.",
+                "constraints": "- Defend against XSS\n- Defend against CSRF",
+                "examples": "Example: User signs in with email/password and requests private API endpoints.",
+                "expected_concepts": ["httponly cookie", "access token", "refresh token", "jwt verification", "samesite", "cors"],
+                "hints": [
+                    "Discuss where access tokens and refresh tokens should be stored to minimize risk.",
+                    "Why is storing sensitive tokens in localStorage vulnerable to Cross-Site Scripting (XSS)?",
+                    "Explain storing short-lived access tokens in memory paired with httpOnly, Secure cookies for refresh tokens.",
+                    "Detail the Express auth middleware extracting the token from Authorization headers or cookies and verifying the secret signature."
+                ],
+                "follow_up": "Since JWTs are stateless, what happens if a token is stolen or a user clicks Logout? How would the server revoke an active JWT before expiration?"
+            }
+        ],
+        is_active=True,
+        created_at=time.time()
+    )
+
+    db.add_all([s1, s2])
+    db.commit()
 
 def seed_web_dev_viva(db: Session):
     print("Seeding Web Development Viva #43...")

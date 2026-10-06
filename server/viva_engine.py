@@ -11,7 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from server.models import (
     VivaSession, QuestionAsked, StudentAnswer, Question, Topic,
     SessionPhase, SessionStatus, QuestionType, AnswerQuality,
-    FollowupAction, IntegrityLog
+    FollowupAction, IntegrityLog, TrainedSyllabus
 )
 from server.prompts import AI_TECHNICAL_INTERVIEWER_SYSTEM_PROMPT
 
@@ -43,61 +43,200 @@ HINGLISH_TRANSLATION_MAP = {
     "aakhri element": "last element"
 }
 
-# Structured DSA Problems with explicit sections (Section 3 & 4)
-DSA_PROBLEMS = {
+# Curated LeetCode Problems (Strictly LeetCode + Admin/Custom Only)
+LEETCODE_PROBLEMS = {
     "two_sum": {
-        "id": "two_sum",
-        "title": "Two Sum",
-        "level": "Beginner",
-        "statement": "Given an array of integers nums and an integer target, return the indices of the two numbers such that they add up to target.",
-        "input_desc": "nums: List[int], target: int",
-        "output_desc": "List[int] containing the 0-based indices of the two elements.",
-        "constraints": "- 2 <= nums.length <= 10^4\n- -10^9 <= nums[i] <= 10^9\n- -10^9 <= target <= 10^9\n- Exactly one valid answer exists.\n- You may not use the same element twice.",
-        "examples": "Example 1:\nInput: nums = [2, 7, 11, 15], target = 9\nOutput: [0, 1] (Explanation: nums[0] + nums[1] == 9)\n\nExample 2:\nInput: nums = [3, 2, 4], target = 6\nOutput: [1, 2]",
-        "expected_concepts": ["hash map", "hash table", "complement", "O(N) time", "O(N) space", "two pointers"],
+        "id": "leetcode_1_two_sum",
+        "source_type": "LEETCODE",
+        "number": 1,
+        "title": "LeetCode #1: Two Sum",
+        "level": "Easy",
+        "topic": "Arrays & Hash Table",
+        "statement": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nYou can return the answer in any order.",
+        "input_desc": "nums: vector<int>&, target: int",
+        "output_desc": "vector<int>: indices of the two numbers",
+        "constraints": "- 2 <= nums.length <= 10^4\n- -10^9 <= nums[i] <= 10^9\n- -10^9 <= target <= 10^9\n- Exactly one valid answer exists.",
+        "examples": "Example 1:\nInput: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].\n\nExample 2:\nInput: nums = [3,2,4], target = 6\nOutput: [1,2]\n\nExample 3:\nInput: nums = [3,3], target = 6\nOutput: [0,1]",
+        "expected_concepts": ["hash map", "unordered_map", "complement", "O(N) time", "O(N) space", "two pointers"],
+        "starter_code_cpp": """#include <iostream>
+#include <vector>
+#include <unordered_map>
+using namespace std;
+
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Return indices of the two numbers that add up to target
+        
+        return {};
+    }
+};
+""",
+        "starter_code_js": """/**
+ * @param {number[]} nums
+ * @param {number} target
+ * @return {number[]}
+ */
+var twoSum = function(nums, target) {
+    // Return indices of the two numbers that add up to target
+    
+    return [];
+};
+""",
         "hints": [
             "Think about what information you need to look up for each number as you iterate through the array.",
-            "Consider whether a hash table or dictionary can help you look up the required complement (target - current_num) in average O(1) time.",
-            "As you traverse each element at index i, check if (target - nums[i]) is already stored in your hash map. If so, return [map[target - nums[i]], i]. If not, insert nums[i] -> i.",
-            "Initialize an empty map seen = {}. Loop index i, value n in nums: if (target - n) in seen, return [seen[target - n], i]. Otherwise set seen[n] = i."
+            "Consider whether a hash table (unordered_map in C++) can help you look up the required complement (target - current_num) in average O(1) time.",
+            "As you traverse each element at index i, check if (target - nums[i]) is already in your hash map. If so, return {map[target - nums[i]], i}. Otherwise insert nums[i] -> i.",
+            "Initialize unordered_map<int, int> seen. For i from 0 to n-1: int complement = target - nums[i]; if (seen.count(complement)) return {seen[complement], i}; seen[nums[i]] = i; return {}."
         ],
-        "follow_up_sorted": "What if the input array is already sorted in ascending order? How would you solve this without using extra memory (in O(1) auxiliary space)?"
+        "follow_up_sorted": "What if the input array is already sorted in ascending order? How would you solve this in O(1) auxiliary space without extra memory?"
+    },
+    "reverse_linked_list": {
+        "id": "leetcode_206_reverse_linked_list",
+        "source_type": "LEETCODE",
+        "number": 206,
+        "title": "LeetCode #206: Reverse Linked List",
+        "level": "Easy",
+        "topic": "Linked List",
+        "statement": "Given the head of a singly linked list, reverse the list, and return the reversed list.",
+        "input_desc": "head: ListNode*",
+        "output_desc": "ListNode*: head of reversed list",
+        "constraints": "- The number of nodes in the list is the range [0, 5000].\n- -5000 <= Node.val <= 5000",
+        "examples": "Example 1:\nInput: head = [1,2,3,4,5]\nOutput: [5,4,3,2,1]\n\nExample 2:\nInput: head = [1,2]\nOutput: [2,1]\n\nExample 3:\nInput: head = []\nOutput: []",
+        "expected_concepts": ["linked list", "prev pointer", "curr pointer", "next pointer", "iterative", "O(N) time", "O(1) space"],
+        "starter_code_cpp": """/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        // Reverse singly linked list and return new head
+        
+        return nullptr;
+    }
+};
+""",
+        "starter_code_js": """/**
+ * Definition for singly-linked list.
+ * function ListNode(val, next) {
+ *     this.val = (val===undefined ? 0 : val)
+ *     this.next = (next===undefined ? null : next)
+ * }
+ * @param {ListNode} head
+ * @return {ListNode}
+ */
+var reverseList = function(head) {
+    // Reverse singly linked list and return new head
+    
+    return null;
+};
+""",
+        "hints": [
+            "Think about manipulating pointers iteratively: at each node, what needs to point where?",
+            "Maintain three pointers: prev (initially nullptr), curr (initially head), and next_node.",
+            "In each step, save curr->next to next_node, point curr->next = prev, move prev = curr, and curr = next_node.",
+            "Loop while (curr != nullptr): ListNode* nxt = curr->next; curr->next = prev; prev = curr; curr = nxt; Return prev."
+        ],
+        "follow_up_sorted": "Can you reverse the linked list recursively and explain the difference in call stack space complexity?"
     },
     "longest_substring": {
-        "id": "longest_substring",
-        "title": "Longest Substring Without Repeating Characters",
-        "level": "Intermediate",
+        "id": "leetcode_3_longest_substring",
+        "source_type": "LEETCODE",
+        "number": 3,
+        "title": "LeetCode #3: Longest Substring Without Repeating Characters",
+        "level": "Medium",
+        "topic": "Sliding Window & Hash Set",
         "statement": "Given a string s, find the length of the longest substring without repeating characters.",
-        "input_desc": "s: str",
-        "output_desc": "int representing the length of the longest substring.",
+        "input_desc": "s: string",
+        "output_desc": "int: length of longest substring without repeating characters",
         "constraints": "- 0 <= s.length <= 5 * 10^4\n- s consists of English letters, digits, symbols and spaces.",
-        "examples": "Example 1:\nInput: s = \"abcabcbb\"\nOutput: 3 (Explanation: The answer is \"abc\", with length 3)\n\nExample 2:\nInput: s = \"bbbbb\"\nOutput: 1 (Explanation: The answer is \"b\", length 1)\n\nExample 3:\nInput: s = \"pwwkew\"\nOutput: 3 (Explanation: The answer is \"wke\", length 3)",
-        "expected_concepts": ["sliding window", "two pointers", "hash set", "hash map", "O(N) time", "frequency map"],
+        "examples": "Example 1:\nInput: s = \"abcabcbb\"\nOutput: 3\nExplanation: The answer is \"abc\", with length of 3.\n\nExample 2:\nInput: s = \"bbbbb\"\nOutput: 1\nExplanation: The answer is \"b\", with length of 1.\n\nExample 3:\nInput: s = \"pwwkew\"\nOutput: 3\nExplanation: The answer is \"wke\", with length of 3.",
+        "expected_concepts": ["sliding window", "two pointers", "unordered_set", "hash map", "O(N) time"],
+        "starter_code_cpp": """#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
+using namespace std;
+
+class Solution {
+public:
+    int lengthOfLongestSubstring(string s) {
+        // Return length of longest substring without repeating characters
+        
+        return 0;
+    }
+};
+""",
+        "starter_code_js": """/**
+ * @param {string} s
+ * @return {number}
+ */
+var lengthOfLongestSubstring = function(s) {
+    // Return length of longest substring without repeating characters
+    
+    return 0;
+};
+""",
         "hints": [
             "Think about maintaining a contiguous window of characters as you scan through the string from left to right.",
-            "Can you use the Two Pointers or Sliding Window pattern with a hash set or dictionary to track characters in the current window?",
-            "Use two pointers, left and right. Expand right to include characters until you see a duplicate, then shrink left until the duplicate is expelled.",
-            "Store the last seen index of each character in a map seen = {}. When a duplicate char is seen at index right, advance left = max(left, seen[char] + 1) and record max_len = max(max_len, right - left + 1)."
+            "Can you use the Two Pointers or Sliding Window pattern with a hash map to record the last seen index of each character?",
+            "When a duplicate character is seen at index right, move left = max(left, last_seen[char] + 1).",
+            "Initialize unordered_map<char, int> seen, max_len = 0, left = 0. For right from 0 to s.length()-1: if char in seen, left = max(left, seen[char] + 1); seen[char] = right; max_len = max(max_len, right - left + 1); Return max_len."
         ],
-        "follow_up_sorted": "How would you optimize this if the character set is strictly limited to 26 lowercase English letters or ASCII, rather than arbitrary Unicode?"
+        "follow_up_sorted": "How would you optimize this if the character set is strictly 26 lowercase English letters or ASCII?"
     },
-    "subarray_sum": {
-        "id": "subarray_sum",
-        "title": "Subarray Sum Equals K",
-        "level": "Advanced",
-        "statement": "Given an array of integers nums and an integer k, return the total number of non-empty subarrays whose sum equals to k.",
-        "input_desc": "nums: List[int], k: int",
-        "output_desc": "int representing the count of continuous subarrays with sum k.",
-        "constraints": "- 1 <= nums.length <= 2 * 10^4\n- -1000 <= nums[i] <= 1000\n- -10^7 <= k <= 10^7",
-        "examples": "Example 1:\nInput: nums = [1, 1, 1], k = 2\nOutput: 2\n\nExample 2:\nInput: nums = [1, 2, 3], k = 3\nOutput: 2 (Subarrays: [1, 2] and [3])",
-        "expected_concepts": ["prefix sum", "hash map", "cumulative sum", "O(N) time", "O(N) space", "negative numbers"],
+    "debounce": {
+        "id": "leetcode_2627_debounce",
+        "source_type": "LEETCODE",
+        "number": 2627,
+        "title": "LeetCode #2627: Debounce Async Dispatcher",
+        "level": "Medium",
+        "topic": "JavaScript Event Loop & Closures",
+        "statement": "Given a function fn and a time in milliseconds t, return a debounced version of that function.\n\nA debounced function is a function whose execution is delayed by t milliseconds and whose execution is cancelled if it is called again within that window of time. The debounced function should also receive the passed parameters.",
+        "input_desc": "fn: Function, t: number",
+        "output_desc": "Function: debounced wrapper function",
+        "constraints": "- 0 <= t <= 1000\n- fn returns void or promise",
+        "examples": "Example 1:\nInput: t = 50, calls = [{\"t\": 50, inputs: [1]}, {\"t\": 75, inputs: [2]}]\nOutput: [{\"t\": 125, inputs: [2]}]\nExplanation: 1st call cancelled because 2nd call was triggered at 75ms before 50+50=100ms.",
+        "expected_concepts": ["closure", "cleartimeout", "settimeout", "timer id", "event loop", "rest params"],
+        "starter_code_js": """/**
+ * @param {Function} fn
+ * @param {number} t milliseconds
+ * @return {Function}
+ */
+var debounce = function(fn, t) {
+    let timerId = null;
+    return function(...args) {
+        // Return debounced function execution
+        
+    };
+};
+""",
+        "starter_code_cpp": """#include <iostream>
+#include <chrono>
+#include <functional>
+using namespace std;
+
+class DebounceWorker {
+public:
+    void dispatch(int delayMs, function<void()> fn) {
+        // C++ Async Debounced Worker
+    }
+};
+""",
         "hints": [
-            "Notice that the array can contain negative numbers, so a standard two-pointer sliding window cannot expand/contract monotonically.",
-            "Think about cumulative prefix sums: if prefix_sum[j] - prefix_sum[i] == k, what does that tell you about the subarray from i to j?",
-            "Store prefix sum frequencies in a hash map: prefix_counts = {0: 1}. At each element, update current_sum and add prefix_counts[current_sum - k] to total.",
-            "Initialize prefix_map = {0: 1}, count = 0, current_sum = 0. For n in nums: current_sum += n; count += prefix_map.get(current_sum - k, 0); prefix_map[current_sum] = prefix_map.get(current_sum, 0) + 1."
+            "Use a closure to keep track of a timerId variable across repeated invocations.",
+            "Each time the returned wrapper function is called, immediately invoke clearTimeout(timerId).",
+            "Then set timerId = setTimeout(() => fn(...args), t) so only the final call in the burst executes.",
+            "let timer; return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), t); };"
         ],
-        "follow_up_sorted": "Why does a two-pointer sliding window fail when negative numbers are present, whereas it works when all numbers are strictly positive?"
+        "follow_up_sorted": "What is the difference between debounce and throttle, and when would you use throttle for UI scroll listeners instead?"
     }
 }
 
@@ -211,97 +350,91 @@ class VivaEngine:
             else:
                 return AnswerQuality.PARTIAL, FollowupAction.HINT, detected, missing
 
-    def _call_llm_interviewer(self, session: VivaSession, conversation_history: List[Dict[str, str]], latest_input: str, code_snippet: Optional[str] = None) -> Optional[str]:
+    def generate_continuous_followup(self, candidate_text: str, domain: str) -> str:
         """
-        Attempts to call Groq / OpenAI LLM using the Master Prompt.
-        Returns generated next question text or None on failure/missing keys.
+        Continuously analyzes what the candidate just explained and generates
+        a relevant, Socratic follow-up question directly linked to their answer.
         """
-        profile = session.interview_profile or {}
-        hints_used = profile.get("hints_used", 0)
+        lowered = candidate_text.lower()
 
-        # Build message log
-        system_content = AI_TECHNICAL_INTERVIEWER_SYSTEM_PROMPT + f"""
+        # 1. Linked list / pointer discussion
+        if any(k in lowered for k in ["linked list", "node", "pointer", "reverse", "singly"]):
+            return (
+                "You explained pointer operations in linked lists nicely. Building directly on that: "
+                "if you were asked to find the middle node or count the total number of nodes in a singly linked list in a single pass without knowing the length in advance, "
+                "what two-pointer approach (fast and slow pointers) would you use?"
+            )
 
-[CURRENT INTERVIEW CONTEXT]
-Candidate Name: {session.student_name}
-Target Domain: {session.preferred_domain or 'DSA & Web Development'}
-Target Level: {session.interview_level or 'Intermediate'}
-Elapsed Seconds: {session.elapsed_seconds}
-Hints Used So Far: {hints_used}
+        # 2. Array / Contiguous / Dynamic resizing
+        if any(k in lowered for k in ["array", "vector", "contiguous", "index", "realloc", "cache", "memory"]):
+            return (
+                "Good point on contiguous memory. How does dynamic array resizing (like std::vector in C++) achieve amortized O(1) push_back operations, "
+                "and what happens to memory cache locality during traversal compared to node-based structures?"
+            )
 
-REMINDERS:
-- Ask exactly ONE concise question at a time.
-- Do NOT dump multiple questions.
-- Do NOT reveal the answer.
-- Probe the quality of thinking.
-- If code was submitted, evaluate correctness, complexity, or edge cases.
-"""
+        # 3. Hash map / lookup / collisions
+        if any(k in lowered for k in ["hash", "hashmap", "map", "dictionary", "key", "lookup", "bucket"]):
+            return (
+                "That's a sound explanation of key-value lookup. How do hash tables resolve hash collisions when two distinct keys map to the exact same bucket index? "
+                "What is the trade-off between separate chaining and open addressing?"
+            )
 
-        messages = [{"role": "system", "content": system_content}]
-        for turn in conversation_history[-8:]:
-            messages.append({"role": turn.get("role", "user"), "content": turn.get("content", "")})
+        # 4. Stack / Queue / LIFO / FIFO
+        if any(k in lowered for k in ["stack", "queue", "lifo", "fifo", "push", "pop"]):
+            return (
+                "Exactly. How would you implement a Queue using two Stacks while preserving amortized O(1) time complexity for enqueue and dequeue operations?"
+            )
 
-        curr_msg = latest_input
-        if code_snippet:
-            curr_msg += f"\n[Candidate Code Submitted in Editor]:\n```{code_snippet}```"
-        messages.append({"role": "user", "content": curr_msg})
+        # 5. Recursion / Call stack
+        if any(k in lowered for k in ["recursion", "recursive", "call stack", "base case", "tree"]):
+            return (
+                "You highlighted recursive decomposition. What causes a stack overflow in recursive execution, "
+                "and how can tail-call optimization or iterative memoization prevent excessive call stack growth?"
+            )
 
-        # Try Groq first (ultra-fast)
-        if self.groq_api_key:
-            try:
-                res = requests.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {self.groq_api_key}", "Content-Type": "application/json"},
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": messages,
-                        "temperature": 0.4,
-                        "max_tokens": 300
-                    },
-                    timeout=5
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    if content:
-                        return content
-            except Exception as e:
-                print(f"[VivaEngine] Groq LLM failed: {e}")
+        # 6. Event loop / Promises / Async
+        if any(k in lowered for k in ["event loop", "microtask", "macrotask", "promise", "async", "await"]):
+            return (
+                "Good explanation of asynchronous execution. In the JavaScript Event Loop, what is the exact execution priority between Promise microtasks (Promise.then) "
+                "and macrotasks (setTimeout / setInterval) when the call stack clears?"
+            )
 
-        # Try OpenAI
-        if self.openai_api_key:
-            try:
-                res = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {self.openai_api_key}", "Content-Type": "application/json"},
-                    json={
-                        "model": "gpt-4o-mini",
-                        "messages": messages,
-                        "temperature": 0.4,
-                        "max_tokens": 300
-                    },
-                    timeout=6
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    if content:
-                        return content
-            except Exception as e:
-                print(f"[VivaEngine] OpenAI LLM failed: {e}")
+        # 7. React / Virtual DOM / Reconciliation
+        if any(k in lowered for k in ["react", "state", "hook", "re-render", "virtual dom", "fiber"]):
+            return (
+                "Building on component rendering in React: what causes stale closures inside useEffect or useCallback, "
+                "and how does React 18 automatic state batching optimize render performance?"
+            )
 
-        return None
+        # 8. JWT / Cookies / Auth / Security
+        if any(k in lowered for k in ["jwt", "token", "cookie", "auth", "session", "cors", "csrf", "xss"]):
+            return (
+                "Good explanation of token authentication. Why is storing an access token in localStorage vulnerable to Cross-Site Scripting (XSS), "
+                "and how does an httpOnly cookie with the SameSite attribute mitigate CSRF attacks?"
+            )
 
-    def _format_dsa_problem(self, problem: Dict[str, Any]) -> str:
-        """Formats problem strictly as required by Section 3."""
+        # Fallback continuous question
+        if domain == "webdev":
+            return (
+                "Interesting reasoning on that web architecture concept. Can you think about it from this perspective: "
+                "how would this architecture scale under heavy concurrent traffic, and what caching strategy (like Redis or browser HTTP cache) would you add?"
+            )
+        else:
+            return (
+                "Interesting observation on that data structure. Can you think about it from this perspective: "
+                "what happens to the auxiliary space complexity and call stack if you implement that iteratively versus recursively?"
+            )
+
+    def _format_coding_problem(self, problem: Dict[str, Any]) -> str:
+        """Formats coding problem for the LeetCode box display."""
+        source_badge = f"📋 **[From Candidate's Uploaded Syllabus: {problem.get('syllabus_title')}]**\n\n" if problem.get("syllabus_title") else f"🏷️ **[{problem.get('title', 'LeetCode Problem')}]** • Difficulty: **{problem.get('level', 'Medium')}**\n\n"
         return (
-            f"Here is our DSA problem on {problem['title']}:\n\n"
-            f"**Problem Statement:**\n{problem['statement']}\n\n"
+            f"{source_badge}**Problem Statement:**\n{problem['statement']}\n\n"
             f"**Input Description:**\n{problem['input_desc']}\n\n"
             f"**Output Description:**\n{problem['output_desc']}\n\n"
             f"**Constraints:**\n{problem['constraints']}\n\n"
             f"**Examples:**\n{problem['examples']}\n\n"
-            "Take a moment to review this. Before writing any code, please explain your understanding of the problem, any observations, and what approach you are considering."
+            "Take a moment to review this. Please explain your observations, approach, and Big-O complexity before coding."
         )
 
     def select_next_turn(
@@ -312,15 +445,16 @@ REMINDERS:
         is_giveup: bool,
         is_silence: bool,
         is_hint_req: bool
-    ) -> Tuple[str, Optional[int], QuestionType, Dict[str, Any]]:
+    ) -> Tuple[str, str, bool, bool, Optional[Dict[str, Any]], Optional[int], QuestionType, Dict[str, Any]]:
         """
-        Stateful, adaptive interviewer logic following all 19 guidelines.
+        Stateful, adaptive interviewer logic following MSOT & LeetCode specifications.
+        Returns:
+        (ai_response_text, audio_spoken_text, is_coding_question, should_ask_to_read, coding_problem_details, next_qid, next_qtype, updated_profile)
         """
         profile = session.interview_profile or {}
         q_count = len(session.questions_asked)
         lowered_input = student_transcript.lower()
 
-        # Update interview profile memory
         stage = profile.get("stage", "INTRO")
         preferred_domain = profile.get("preferred_domain", session.preferred_domain or "dsa")
         level = profile.get("level", session.interview_level or "Intermediate")
@@ -342,10 +476,10 @@ REMINDERS:
             "adapts_to_changed_constraints": False
         })
 
-        # Observe candidate characteristics from current turn
+        # Observe candidate characteristics
         if "?" in student_transcript or any(w in lowered_input for w in ["can the", "is it guaranteed", "are there duplicates", "what if"]):
             characteristics["asks_clarifying_questions"] = True
-        if any(w in lowered_input for w in ["hash map", "hash table", "two pointer", "sliding window", "binary search", "prefix sum", "recursion", "dynamic programming"]):
+        if any(w in lowered_input for w in ["hash map", "unordered_map", "two pointer", "sliding window", "binary search", "prefix sum", "recursion", "dynamic programming"]):
             characteristics["identifies_core_pattern"] = True
         if any(w in lowered_input for w in ["because", "since", "reason", "approach", "the idea is"]):
             characteristics["explains_reasoning"] = True
@@ -360,222 +494,180 @@ REMINDERS:
         if any(w in lowered_input for w in ["empty", "null", "single element", "negative", "duplicates", "edge case"]):
             characteristics["considers_edge_cases"] = True
 
-        # Pick chosen DSA problem based on level
-        prob_key = "two_sum" if level.lower() == "beginner" else ("subarray_sum" if level.lower() == "advanced" else "longest_substring")
-        problem = DSA_PROBLEMS.get(prob_key, DSA_PROBLEMS["longest_substring"])
+        profile["characteristics"] = characteristics
 
-        # Handle Prompt Injection (Section 12 / Integrity)
+        # Determine chosen LeetCode or Custom Syllabus Problem
+        custom_syllabus = None
+        if hasattr(session, "active_syllabus_id") and session.active_syllabus_id:
+            custom_syllabus = self.db.query(TrainedSyllabus).filter(TrainedSyllabus.id == session.active_syllabus_id).first()
+        if not custom_syllabus:
+            target_sub = "Web Development" if preferred_domain == "webdev" else "Data Structures & Algorithms"
+            custom_syllabus = self.db.query(TrainedSyllabus).filter(
+                TrainedSyllabus.is_active == True,
+                TrainedSyllabus.subject == target_sub
+            ).order_by(TrainedSyllabus.created_at.desc()).first()
+
+        # Pick base LeetCode problem
+        if preferred_domain == "webdev":
+            prob_key = "debounce"
+        else:
+            prob_key = "two_sum" if level.lower() == "beginner" else ("longest_substring" if level.lower() == "intermediate" else "two_sum")
+        problem = LEETCODE_PROBLEMS.get(prob_key, LEETCODE_PROBLEMS["two_sum"])
+
+        if custom_syllabus and custom_syllabus.generated_questions:
+            q_idx = profile.get("custom_q_idx", 0) % len(custom_syllabus.generated_questions)
+            custom_q = custom_syllabus.generated_questions[q_idx]
+            problem = {
+                "id": f"custom_{custom_syllabus.id}_{q_idx}",
+                "source_type": "ADMIN_CUSTOM",
+                "title": custom_q.get("title", problem["title"]),
+                "level": custom_q.get("level", level),
+                "statement": custom_q.get("statement", problem["statement"]),
+                "input_desc": custom_q.get("input_desc", problem["input_desc"]),
+                "output_desc": custom_q.get("output_desc", problem["output_desc"]),
+                "constraints": custom_q.get("constraints", problem["constraints"]),
+                "examples": custom_q.get("examples", problem["examples"]),
+                "expected_concepts": custom_q.get("expected_concepts", problem["expected_concepts"]),
+                "hints": custom_q.get("hints", problem["hints"]),
+                "follow_up_sorted": custom_q.get("follow_up", problem.get("follow_up_sorted", "How would you optimize this approach?")),
+                "syllabus_title": custom_syllabus.title,
+                "starter_code_cpp": custom_q.get("starter_code_cpp", problem.get("starter_code_cpp", "")),
+                "starter_code_js": custom_q.get("starter_code_js", problem.get("starter_code_js", ""))
+            }
+
+        # 1. Handle Prompt Injection
         if self.detect_prompt_injection(student_transcript):
             return (
                 "Let's stay focused on our technical interview. Could you explain the time and space complexity of the approach you were discussing?",
-                None,
-                QuestionType.CONCEPT,
-                profile
+                "Let's stay focused on our technical interview. Could you explain the time and space complexity of the approach you were discussing?",
+                False, False, None, None, QuestionType.CONCEPT, profile
             )
 
-        # Handle Progressive Hints (Section 6)
+        # 2. Handle Progressive Hints
         if is_hint_req or ("hint" in lowered_input and len(student_transcript.split()) < 10):
             hint_level = min(4, hint_level + 1)
             hints_used += 1
             profile["hints_used"] = hints_used
             profile["hint_level"] = hint_level
             hint_text = problem["hints"][hint_level - 1]
-            return (
-                f"[Hint Level {hint_level}]: {hint_text}\n\nHow does this guide your line of thinking?",
-                None,
-                QuestionType.WHY,
-                profile
-            )
+            hint_msg = f"[Hint Level {hint_level}]: {hint_text}\n\nHow does this guide your line of thinking?"
+            return (hint_msg, hint_msg, stage.startswith("CODING"), False, problem if stage.startswith("CODING") else None, None, QuestionType.WHY, profile)
 
-        # Handle 'I don't know' or giving up (Section 2, 6, 10)
+        # 3. Handle 'I don't know' / giving up
         if is_giveup or "i don't know" in lowered_input or "no idea" in lowered_input:
             if hint_level < 2:
                 hint_level = 1
                 hints_used += 1
                 profile["hints_used"] = hints_used
                 profile["hint_level"] = hint_level
-                return (
-                    f"That's completely fine. Let's break it down together with a small direction: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?",
-                    None,
-                    QuestionType.CONCEPT,
-                    profile
-                )
-            else:
-                # Transition smoothly
-                stage = "WEB_DEV_1"
-                profile["stage"] = stage
-                return (
-                    "No problem at all! Let's switch gears and explore Web Development systems. Suppose you have a React frontend and Express backend. Explain how you would implement authentication using JWT. Where would you store the token, how would the server verify it, and what security concerns would you consider?",
-                    None,
-                    QuestionType.APPLIED,
-                    profile
-                )
+                h_msg = f"That's completely fine. Let's break it down together with a small direction: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?"
+                return (h_msg, h_msg, stage.startswith("CODING"), False, problem if stage.startswith("CODING") else None, None, QuestionType.CONCEPT, profile)
 
-        # STAGE 0: Introduction & Background Discovery (Section 19)
-        if q_count == 0 or stage == "INTRO":
-            # Extract preferred domain and level from candidate's answer
+        # STAGE 0: Introduction & Setup
+        if q_count == 0 or stage in ["INTRO", "WARMUP"]:
             if "web" in lowered_input:
                 preferred_domain = "webdev"
             elif "dsa" in lowered_input or "data structure" in lowered_input or "algorithm" in lowered_input:
                 preferred_domain = "dsa"
-            
-            if "beginner" in lowered_input:
-                level = "Beginner"
-            elif "advanced" in lowered_input:
-                level = "Advanced"
-            elif "intermediate" in lowered_input:
-                level = "Intermediate"
+
+            if "beginner" in lowered_input: level = "Beginner"
+            elif "advanced" in lowered_input: level = "Advanced"
+            elif "intermediate" in lowered_input: level = "Intermediate"
 
             profile["preferred_domain"] = preferred_domain
             profile["level"] = level
-            profile["stage"] = "WARMUP"
+            profile["stage"] = "GENERAL_CONCEPT_1"
             session.preferred_domain = preferred_domain
             session.interview_level = level
 
-            # Warm-up question (Section 16)
+            # Question 1: General foundational question (Spoken aloud, NO code editor)
             if preferred_domain == "webdev":
-                warmup_q = "Thank you for the introduction! Let's start with a foundational web question: How does the browser Event Loop coordinate the execution of synchronous code, microtasks (like Promises), and macrotasks (like setTimeout)?"
+                q1 = "Thank you for the introduction! Let's start with a foundational general question: How does the JavaScript Event Loop coordinate synchronous execution, Promise microtasks, and timer macrotasks?"
             else:
-                warmup_q = "Thank you for the introduction! Let's warm up with a foundational question: What are the differences between an Array and a Linked List in memory allocation, and how do their insertion and lookup complexities compare?"
-            
-            return (warmup_q, None, QuestionType.CONCEPT, profile)
+                q1 = "Thank you for the introduction! Let's start with a foundational general question: What are the fundamental differences between an Array and a Linked List in memory allocation and cache locality, and how do their insertion and lookup complexities compare?"
 
-        # STAGE 1: Transition from Warmup to DSA Assessment (Section 3, 4, 16)
-        if stage == "WARMUP":
-            profile["stage"] = "DSA_PRESENTED"
-            profile["dsa_problem_id"] = prob_key
-            problem_text = self._format_dsa_problem(problem)
-            return (problem_text, None, QuestionType.CONCEPT, profile)
+            return (q1, q1, False, False, None, None, QuestionType.CONCEPT, profile)
 
-        # STAGE 2: Candidate Explains Understanding / Approach (Section 3, 5, 7)
-        if stage == "DSA_PRESENTED":
-            # Check if candidate jumped straight to code without explaining (Section 3 & 7)
+        # STAGE 1: Continuous Socratic General Follow-up 1
+        if stage == "GENERAL_CONCEPT_1":
+            profile["stage"] = "GENERAL_CONCEPT_2"
+            continuous_q = self.generate_continuous_followup(student_transcript, preferred_domain)
+            return (continuous_q, continuous_q, False, False, None, None, QuestionType.WHY, profile)
+
+        # STAGE 2: Continuous Socratic General Follow-up 2 -> Transition to LeetCode Coding Problem
+        if stage == "GENERAL_CONCEPT_2":
+            profile["stage"] = "CODING_PRESENTED"
+            profile["coding_problem_id"] = problem.get("id")
+
+            formatted_problem = self._format_coding_problem(problem)
+            # Custom spoken audio: Ask before reading the entire question!
+            audio_ask = (
+                f"I have presented {problem['title']} on your screen. "
+                "Would you like me to read through the full problem statement and constraints for you, "
+                "or would you prefer to read it directly and begin explaining your approach?"
+            )
+            return (formatted_problem, audio_ask, True, True, problem, None, QuestionType.CONCEPT, profile)
+
+        # STAGE 3: Candidate Responds to Problem Presentation
+        if stage == "CODING_PRESENTED":
+            # Check if candidate requested reading the question
+            if any(w in lowered_input for w in ["yes", "read it", "please read", "read the question", "read aloud", "sure read"]):
+                profile["stage"] = "CODING_APPROACH_DISCUSSION"
+                spoken_problem = (
+                    f"Here is the problem: {problem['statement']} "
+                    f"The constraints are: {problem['constraints']}. "
+                    "Take a moment to review this. Please explain your observations, what data structure you plan to use, and your expected complexity before coding."
+                )
+                text_response = f"**Problem Statement Read:**\n\n{problem['statement']}\n\n**Constraints:**\n{problem['constraints']}\n\nBefore writing code, please explain your proposed approach and Big-O time and space complexity."
+                return (text_response, spoken_problem, True, False, problem, None, QuestionType.CONCEPT, profile)
+
+            # Candidate explained approach directly
             if code_snippet and len(student_transcript.split()) < 10:
                 characteristics["jumps_to_coding_early"] = True
-                profile["stage"] = "DSA_APPROACH_REASONING"
-                return (
-                    "I notice you jumped straight into writing code. In a technical interview, it's very important to communicate first. Before we inspect the code, could you explain your observations, what data structure you selected, and why you believe it is the optimal approach?",
-                    None,
-                    QuestionType.WHY,
-                    profile
-                )
+                profile["stage"] = "CODING_APPROACH_DISCUSSION"
+                msg = "I notice you jumped straight into code. In a technical interview, it's very important to communicate your thought process first. Could you explain your observations, what data structure you selected, and why it is optimal?"
+                return (msg, msg, True, False, problem, None, QuestionType.WHY, profile)
 
-            # Analyze approach: is it brute force or optimal?
             if any(w in lowered_input for w in ["brute force", "check all", "nested loop", "two loops"]):
-                profile["stage"] = "DSA_OPTIMIZATION"
-                return (
-                    "Good, that brute force approach gives us a correct baseline. What would be the time and space complexity of that nested-loop approach, and can we optimize it to avoid redundant lookups?",
-                    None,
-                    QuestionType.TRADE_OFF,
-                    profile
-                )
+                profile["stage"] = "CODING_OPTIMIZATION"
+                msg = "Good, that brute force approach gives us a correct baseline with O(N^2) time. Can we optimize it to avoid redundant lookups using an auxiliary data structure like a hash map?"
+                return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
-            # Candidate proposed optimal or reasoned approach
-            profile["stage"] = "DSA_CODING"
-            return (
-                "That is a very sound approach! What are the expected time and space complexities for this strategy, and are there any edge cases you'll need to handle once you implement it? Please also feel free to start writing your implementation in the code editor on the right.",
-                None,
-                QuestionType.TRADE_OFF,
-                profile
-            )
+            profile["stage"] = "CODING_IMPLEMENTATION_REVIEW"
+            msg = "That is a very solid approach! What are your expected time and space complexities? Please go ahead and write your implementation in the code editor on the right and return the solution."
+            return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
-        # STAGE 3: DSA Optimization probing (Section 5 Stage 4 & 5)
-        if stage == "DSA_OPTIMIZATION":
-            profile["stage"] = "DSA_CODING"
-            return (
-                "Spot on! With that optimization in mind, what is your improved time complexity? Go ahead and write out your implementation in the code editor on the right screen.",
-                None,
-                QuestionType.CONCEPT,
-                profile
-            )
+        # STAGE 4: Coding Optimization Discussion
+        if stage == "CODING_OPTIMIZATION":
+            profile["stage"] = "CODING_IMPLEMENTATION_REVIEW"
+            msg = "Spot on! With that optimization in mind, go ahead and implement your solution in the code editor on the right and return the result."
+            return (msg, msg, True, False, problem, None, QuestionType.CONCEPT, profile)
 
-        # STAGE 4: Candidate Implementing Code / Reviewing Implementation (Section 5 Stage 6 & Section 13)
-        if stage == "DSA_CODING":
-            profile["stage"] = "DSA_CODE_REVIEW"
+        # STAGE 5: Code Implementation Review & Edge Cases
+        if stage == "CODING_IMPLEMENTATION_REVIEW":
+            profile["stage"] = "CODING_FOLLOW_UP"
             if code_snippet and len(code_snippet.strip()) > 20:
-                # Code evaluation (Section 13)
-                # Check for edge cases
-                return (
-                    "Thank you for writing that out! Looking closely at your implementation, how does your code handle edge cases, such as an empty input, an array with duplicate values, or inputs where no pair exists?",
-                    None,
-                    QuestionType.EDGE_CASE,
-                    profile
-                )
+                msg = "Thank you for implementing that! Looking closely at your solution, how does your code handle boundary conditions, such as an empty input, duplicate values, or inputs where no valid pair exists?"
+                return (msg, msg, True, False, problem, None, QuestionType.EDGE_CASE, profile)
             else:
-                return (
-                    "Please walk me through your code line by line. What is the role of each variable you defined, and how do you ensure the loop terminates correctly?",
-                    None,
-                    QuestionType.WHY,
-                    profile
-                )
+                msg = "Please walk me through your implementation line by line. What is the role of each variable you defined, and how do you ensure the return value is correct?"
+                return (msg, msg, True, False, problem, None, QuestionType.WHY, profile)
 
-        # STAGE 5: DSA Follow-up / Changed Constraint (Section 5 Stage 8, Section 7)
-        if stage == "DSA_CODE_REVIEW":
-            profile["stage"] = "WEB_DEV_1"
-            followup_prompt = problem.get("follow_up_sorted", "What if the input size is scaled to 10^7 elements and memory is strictly limited? How would you modify your approach?")
-            return (
-                f"Well explained! Here is an optimization follow-up: {followup_prompt}",
-                None,
-                QuestionType.TRADE_OFF,
-                profile
-            )
-
-        # STAGE 6: Web Development Assessment (Section 8 & 9)
-        if stage == "WEB_DEV_1":
-            profile["stage"] = "WEB_DEV_FOLLOWUP_1"
-            # Section 9 scenario question
-            return (
-                "That wraps up our algorithmic discussion nicely! Let's now transition to Web Development systems:\n\n"
-                "Suppose you have a React frontend and Express backend. Explain how you would implement authentication using JWT. Where would you store the token, how would the server verify it, and what security concerns would you consider?",
-                None,
-                QuestionType.APPLIED,
-                profile
-            )
-
-        # STAGE 7: Web Development Follow-up 1 (Section 9 & 11)
-        if stage == "WEB_DEV_FOLLOWUP_1":
-            profile["stage"] = "WEB_DEV_FOLLOWUP_2"
-            # Follow-up referencing their choice
-            if "localstorage" in lowered_input:
-                return (
-                    "You mentioned storing the JWT in localStorage. Why choose that over an httpOnly cookie, and what makes localStorage susceptible to XSS (Cross-Site Scripting) attacks? How would you protect against that?",
-                    None,
-                    QuestionType.WHY,
-                    profile
-                )
-            elif "cookie" in lowered_input or "httponly" in lowered_input:
-                return (
-                    "You chose httpOnly cookies, which is great for mitigating XSS. However, does storing cookies expose your API to CSRF (Cross-Site Request Forgery), and what headers or SameSite attributes would you configure to prevent that?",
-                    None,
-                    QuestionType.TRADE_OFF,
-                    profile
-                )
-            else:
-                return (
-                    "Following up on your authentication flow: What happens when the access token expires while the user is actively working? How would you implement a refresh token mechanism without disrupting the user experience?",
-                    None,
-                    QuestionType.WHY,
-                    profile
-                )
-
-        # STAGE 8: Web Development Follow-up 2 (Token Revocation & Route Protection) (Section 9)
-        if stage == "WEB_DEV_FOLLOWUP_2":
+        # STAGE 6: Coding Follow-up / Altered Constraint
+        if stage == "CODING_FOLLOW_UP":
             profile["stage"] = "WRAPUP"
-            return (
-                "Since standard JWTs are stateless, what happens if a user clicks 'Logout' or a token is stolen? How would the server revoke an active JWT before its expiration timestamp? Also, how would you structure an Express middleware to protect private API routes?",
-                None,
-                QuestionType.TRADE_OFF,
-                profile
-            )
+            followup_prompt = problem.get("follow_up_sorted", "What if the input array is already sorted in ascending order? How would you solve this in O(1) auxiliary space without extra memory?")
+            msg = f"Well explained! Here is an optimization follow-up on this problem: {followup_prompt}"
+            return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
-        # STAGE 9: Wrap-up & Final Conclusion (Section 16)
+        # STAGE 7: Wrap-up & Conclusion
         profile["stage"] = "COMPLETED"
-        return (
-            "We have covered all primary DSA and Web Development competencies for this interview! You did a very thorough job reasoning through the algorithmic stages and web architectures. Is there any final clarification or insight you would like to share before we conclude and evaluate?",
-            None,
-            QuestionType.CONCEPT,
-            profile
+        wrap_msg = (
+            "We have covered our primary conceptual foundations and LeetCode problem solving for this interview! "
+            "You did a great job explaining your reasoning and walking through your solution. "
+            "Is there any final insight or question you would like to share before we generate your official MSOT evaluation report?"
         )
+        return (wrap_msg, wrap_msg, False, False, None, None, QuestionType.CONCEPT, profile)
 
     def process_turn(
         self,
@@ -594,7 +686,7 @@ REMINDERS:
     ) -> Dict[str, Any]:
         """
         Executes an end-to-end viva conversational turn with latency profiling,
-        recording acoustic telemetry, code submissions, and memory state.
+        audio telemetry, code submissions, and memory state.
         """
         start_time = time.time()
         session = self.db.query(VivaSession).filter(VivaSession.id == session_id).first()
@@ -659,39 +751,21 @@ REMINDERS:
             )
             self.db.add(answer)
 
-        # Build chat history for LLM
-        history = []
-        for qa in session.questions_asked:
-            history.append({"role": "assistant", "content": qa.question_text})
-            matching_ans = next((a for a in session.answers if a.question_asked_id == qa.id), None)
-            if matching_ans:
-                history.append({"role": "user", "content": matching_ans.transcript})
+        # Select next turn via adaptive state machine
+        (
+            next_text, audio_spoken_text, is_coding_question, should_ask_to_read,
+            coding_problem_details, next_qid, next_qtype, updated_profile
+        ) = self.select_next_turn(
+            session=session,
+            student_transcript=student_transcript,
+            code_snippet=code_snippet,
+            is_giveup=is_giveup,
+            is_silence=is_silence,
+            is_hint_req=is_hint_req
+        )
 
-        # Try LLM first if configured
-        next_text = None
-        next_qid = None
-        next_qtype = QuestionType.CONCEPT
-
-        if (self.groq_api_key or self.openai_api_key) and not is_silence and not is_giveup:
-            llm_text = self._call_llm_interviewer(session, history, student_transcript, code_snippet)
-            if llm_text:
-                next_text = llm_text
-
-        # Fallback to local adaptive interviewer engine
-        if not next_text:
-            local_text, local_qid, local_qtype, updated_profile = self.select_next_turn(
-                session=session,
-                student_transcript=student_transcript,
-                code_snippet=code_snippet,
-                is_giveup=is_giveup,
-                is_silence=is_silence,
-                is_hint_req=is_hint_req
-            )
-            next_text = local_text
-            next_qid = local_qid
-            next_qtype = local_qtype
-            session.interview_profile = dict(updated_profile)
-            flag_modified(session, "interview_profile")
+        session.interview_profile = dict(updated_profile)
+        flag_modified(session, "interview_profile")
 
         # Record new question asked
         new_qa = QuestionAsked(
@@ -712,6 +786,9 @@ REMINDERS:
 
         is_completed = (new_phase in [SessionPhase.SCORING, SessionPhase.COMPLETED]) or (session.interview_profile and session.interview_profile.get("stage") == "COMPLETED")
 
+        # Standard language determination
+        standard_lang = "cpp" if (session.preferred_domain or "dsa") != "webdev" else "javascript"
+
         return {
             "session_id": session.id,
             "current_phase": new_phase.value,
@@ -719,6 +796,11 @@ REMINDERS:
             "duration_minutes": duration_mins,
             "remaining_seconds": rem_sec,
             "ai_response_text": next_text,
+            "audio_spoken_text": audio_spoken_text,
+            "is_coding_question": is_coding_question,
+            "should_ask_to_read": should_ask_to_read,
+            "coding_problem_details": coding_problem_details,
+            "coding_standard_language": standard_lang,
             "question_type": next_qtype.value,
             "answer_quality": quality.value,
             "followup_action": action.value,

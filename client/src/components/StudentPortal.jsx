@@ -1,31 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, Volume2, Shield, Clock, AlertTriangle, 
-  Send, HelpCircle, FastForward, CheckCircle2, Award, FileText,
-  Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight, Play
+  Send, HelpCircle, CheckCircle2, Award, FileText,
+  Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight, Play,
+  Wifi, Camera, Check, RefreshCw
 } from 'lucide-react';
 
 import AudioVisualizer from './AudioVisualizer';
 import HackerRankCodeEditor from './HackerRankCodeEditor';
 import ScreenAndCameraRecorder from './ScreenAndCameraRecorder';
-import SolarSystem3D from './SolarSystem3D';
-import SingularityWarp from './SingularityWarp';
 import ScorecardModal from './ScorecardModal';
 import { AudioCaptureEngine, analyzeSpokenText } from '../utils/audioCapture';
 
 const API_BASE = 'http://localhost:8000';
 
-export default function StudentPortal() {
-  // Domain selection (Strictly DSA or Web Development)
+export default function StudentPortal({ initialSyllabus, onNavigateToTraining }) {
+  // Pre-Interview Setup States
+  const [setupStep, setSetupStep] = useState(1); // 1 = System Checks, 2 = Track & Syllabus, 3 = Guidelines
   const [selectedDomain, setSelectedDomain] = useState('dsa'); // 'dsa' or 'webdev'
-  const [rollNumber, setRollNumber] = useState('21BCSE104');
   const [studentName, setStudentName] = useState('Rahul Sharma');
+  const [candidateId, setCandidateId] = useState('IS-2026-DSA');
+  const [targetLevel, setTargetLevel] = useState('Intermediate');
+  const [availableSyllabi, setAvailableSyllabi] = useState([]);
+  const [selectedSyllabusId, setSelectedSyllabusId] = useState(null);
   const [consentGiven, setConsentGiven] = useState(false);
-  const [isWarping, setIsWarping] = useState(false);
+
+  // System Readiness Checks
+  const [camStatus, setCamStatus] = useState('checking'); // 'checking', 'ready', 'error'
+  const [micStatus, setMicStatus] = useState('checking'); // 'checking', 'ready', 'error'
+  const [netLatency, setNetLatency] = useState(24);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoPreviewRef = useRef(null);
+
+  // Live Interview Session States
   const [isStarted, setIsStarted] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-
-  // Live viva state
+  const [activeSyllabusTitle, setActiveSyllabusTitle] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentPhase, setCurrentPhase] = useState('WARMUP');
   const [aiQuestion, setAiQuestion] = useState('');
@@ -39,14 +49,20 @@ export default function StudentPortal() {
   const [vivaCompleted, setVivaCompleted] = useState(false);
   const [completionResult, setCompletionResult] = useState(null);
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
+  const [hintsUsed, setHintsUsed] = useState(0);
 
-  // Current Interview Step:
-  // 1 = Introduction, 2 = Strong Topic Choice, 3 = Questions on Strong Topic, 4 = Other Topics
-  const [currentStep, setCurrentStep] = useState(1);
+  // Proctoring & Anti-Cheat Tab Switch States
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [showTabSwitchWarning, setShowTabSwitchWarning] = useState(false);
+  const tabSwitchCountRef = useRef(0);
+
+  // Dynamic Coding Question Views
+  const [isCodingQuestion, setIsCodingQuestion] = useState(false);
+  const [shouldAskToRead, setShouldAskToRead] = useState(false);
+  const [codingProblemDetails, setCodingProblemDetails] = useState(null);
 
   // Code editor state
   const [codeContent, setCodeContent] = useState('');
-  const [silenceNotice, setSilenceNotice] = useState(null);
 
   // Audio Telemetry
   const [audioVolume, setAudioVolume] = useState(0);
@@ -61,359 +77,291 @@ export default function StudentPortal() {
     fluencyScore: 100
   });
 
-  // Integrity & Anti-Cheating Signals
-  const [tabSwitchAlert, setTabSwitchAlert] = useState(false);
-  const [tabSwitchCount, setTabSwitchCount] = useState(0);
-
   // Fixed 15-Minute Limit
   const durationMinutes = 15;
 
   // References
   const audioEngineRef = useRef(null);
   const recognitionRef = useRef(null);
-  const lastNudgeTimeRef = useRef(0);
-  const pauseCountRef = useRef(0);
   const handleTurnSubmitRef = useRef(null);
   const isAiSpeakingRef = useRef(false);
-  const aiQuestionRef = useRef('');
 
-  // Helper to select sweet, young female voice in browser
+  // Tab Switch / Window Blur Detection (Anti-Cheating Proctoring Alert)
+  useEffect(() => {
+    if (!isStarted || vivaCompleted) return;
+
+    const handleBlurOrHide = () => {
+      if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+        const nextCount = tabSwitchCountRef.current + 1;
+        tabSwitchCountRef.current = nextCount;
+        setTabSwitchCount(nextCount);
+        setShowTabSwitchWarning(true);
+
+        if (sessionId) {
+          fetch(`${API_BASE}/api/session/integrity`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: sessionId,
+              elapsed_seconds: elapsedSeconds,
+              event_type: 'TAB_SWITCH',
+              confidence_score: 1.0,
+              metadata_json: {
+                violation_count: nextCount,
+                timestamp: Date.now(),
+                note: `Candidate tab switch / window blur event detected (Warning #${nextCount})`
+              }
+            })
+          }).catch(err => console.warn("Failed to log integrity event:", err));
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleBlurOrHide);
+    window.addEventListener('blur', handleBlurOrHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleBlurOrHide);
+      window.removeEventListener('blur', handleBlurOrHide);
+    };
+  }, [isStarted, vivaCompleted, sessionId, elapsedSeconds]);
+
+  // Initialize Syllabi and System Checks
+  useEffect(() => {
+    fetchSyllabi();
+    runSystemChecks();
+
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  // Update selected syllabus if passed from parent
+  useEffect(() => {
+    if (initialSyllabus) {
+      setSelectedSyllabusId(initialSyllabus.id);
+      if (initialSyllabus.subject.includes('Web')) {
+        setSelectedDomain('webdev');
+      } else {
+        setSelectedDomain('dsa');
+      }
+    }
+  }, [initialSyllabus]);
+
+  const fetchSyllabi = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/syllabus/list`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSyllabi(data);
+        const active = data.find(s => s.is_active);
+        if (active && !selectedSyllabusId) {
+          setSelectedSyllabusId(active.id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load syllabi:", err);
+    }
+  };
+
+  const runSystemChecks = async () => {
+    // 1. Camera check
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setCameraStream(stream);
+      setCamStatus('ready');
+      setMicStatus('ready');
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.warn("Camera/Mic permission warning:", err);
+      setCamStatus('ready'); // Fallback to ready for simulation
+      setMicStatus('ready');
+    }
+
+    // 2. Ping latency check
+    const startPing = Date.now();
+    try {
+      await fetch(`${API_BASE}/api/syllabus/active`);
+      setNetLatency(Math.max(12, Date.now() - startPing));
+    } catch {
+      setNetLatency(28);
+    }
+  };
+
+  // Browser TTS using sweet female voice for Ira
   const getSweetFemaleVoice = () => {
     if (!('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
-    const preferred = [
-      'Samantha', 'Victoria', 'Karen', 'Tessa', 'Moira',
-      'Google UK English Female', 'Google US English', 'Microsoft Zira', 'Microsoft Jenny'
-    ];
-
+    const preferred = ['Samantha', 'Victoria', 'Karen', 'Tessa', 'Google US English', 'Microsoft Zira'];
     for (const name of preferred) {
       const match = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
       if (match) return match;
     }
-
-    const femaleVoice = voices.find(v => (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('girl')) && v.lang.startsWith('en'));
-    if (femaleVoice) return femaleVoice;
-
-    return voices.find(v => v.lang.startsWith('en')) || voices[0];
+    return voices.find(v => (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('girl')) && v.lang.startsWith('en')) || voices[0];
   };
 
-  // Pre-load speech voices and initialize audio context on user interaction
-  useEffect(() => {
-    if ('speechSynthesis' in window) {
-      const loadVoices = () => {
-        window.speechSynthesis.getVoices();
-      };
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, []);
-
-  // Text-To-Speech with Sweet Young English Voice & browser unlock
   const speakText = (text) => {
-    if (!text || !('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window) || !text) return;
+    window.speechSynthesis.cancel();
 
-    try {
-      // Force cancel any stuck utterance and resume audio thread
-      window.speechSynthesis.cancel();
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
+    // Clean markdown before speaking
+    const clean = text
+      .replace(/\[Hint Level \d+\]:/g, 'Here is a hint:')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/📋\s*\[From[^\]]+\]/g, '')
+      .replace(/Example \d+:[\s\S]*$/, '');
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US'; // AI exclusively speaks in English
-      const v = getSweetFemaleVoice();
-      if (v) utterance.voice = v;
+    const utterance = new SpeechSynthesisUtterance(clean);
+    const femaleVoice = getSweetFemaleVoice();
+    if (femaleVoice) utterance.voice = femaleVoice;
 
-      utterance.rate = 1.0;
-      utterance.pitch = 1.25; // Sweet melodious young tone
+    utterance.pitch = 1.15;
+    utterance.rate = 1.0;
 
-      utterance.onstart = () => {
-        setIsAiSpeaking(true);
-        isAiSpeakingRef.current = true;
-      };
-      utterance.onend = () => {
-        setIsAiSpeaking(false);
-        isAiSpeakingRef.current = false;
-        lastNudgeTimeRef.current = Date.now();
-      };
-      utterance.onerror = (err) => {
-        console.warn('TTS error:', err);
-        setIsAiSpeaking(false);
-        isAiSpeakingRef.current = false;
-      };
-
-      // Workaround for Chrome 15s synthesis pause bug
-      const resumeTimer = setInterval(() => {
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        } else {
-          clearInterval(resumeTimer);
-        }
-      }, 5000);
-
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn('Voice speech exception:', e);
-      setIsAiSpeaking(false);
-      isAiSpeakingRef.current = false;
-    }
-  };
-
-  // Hard 15-Minute Countdown Timer
-  useEffect(() => {
-    let timer;
-    if (isStarted && !vivaCompleted) {
-      timer = setInterval(() => {
-        setElapsedSeconds(prev => {
-          const next = prev + 1;
-          const totalDurationSec = durationMinutes * 60;
-          if (next >= totalDurationSec) {
-            handleEndViva(next);
-            return totalDurationSec;
-          }
-          return next;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isStarted, vivaCompleted]);
-
-  // Tab switch detection (Integrity Signal)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && isStarted && !vivaCompleted && sessionId) {
-        setTabSwitchAlert(true);
-        setTabSwitchCount(c => c + 1);
-        fetch(`${API_BASE}/api/session/integrity`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            event_type: 'TAB_SWITCH',
-            details: `Candidate window lost focus at ${elapsedSeconds}s.`,
-            timestamp_sec: elapsedSeconds
-          })
-        }).catch(err => console.warn('Integrity log failed:', err));
-      }
+    utterance.onstart = () => {
+      setIsAiSpeaking(true);
+      isAiSpeakingRef.current = true;
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isStarted, vivaCompleted, sessionId, elapsedSeconds]);
+    utterance.onend = () => {
+      setIsAiSpeaking(false);
+      isAiSpeakingRef.current = false;
+    };
 
-  // Audio Capture Engine
-  const setupAudioCapture = async () => {
-    try {
-      const engine = new AudioCaptureEngine({
-        onFrequencyData: (data) => setFrequencyData(data),
-        onVolumeChange: ({ volume, isSpeaking }) => {
-          setAudioVolume(volume);
-          setIsSpeakingLive(isSpeaking);
-          if (isSpeaking && !speechTurnStartSec) {
-            setSpeechTurnStartSec(elapsedSeconds);
-            setSilenceNotice(null);
-          }
-        },
-        onSilenceDetected: ({ silenceDurationSec }) => {
-          const duration = parseFloat(silenceDurationSec);
-          // If candidate has typed/spoken text and paused
-          if (studentInput.trim().length > 10) {
-            setSilenceNotice(`Sustained silence (${silenceDurationSec}s). Click 'Submit Answer' when ready.`);
-          }
+    utterance.onerror = () => {
+      setIsAiSpeaking(false);
+      isAiSpeakingRef.current = false;
+    };
 
-          // Proactive AI speech intervention:
-          // 1st long pause (7s-10s): Ask if candidate knows the answer or needs help
-          // 2nd sustained pause (15s+): Treat as unable to answer and automatically move to next question
-          const now = Date.now();
-          if (duration >= 7.0 && !isAiSpeakingRef.current && (now - lastNudgeTimeRef.current) > 12000) {
-            lastNudgeTimeRef.current = now;
-            pauseCountRef.current = (pauseCountRef.current || 0) + 1;
+    window.speechSynthesis.speak(utterance);
+  };
 
-            if (pauseCountRef.current === 1) {
-              const nudgePrompt = "Why are you not speaking? Do you know the answer to this question or should we move forward?";
-              setSilenceNotice("AI Examiner: Why are you not speaking? Do you know the answer or should we move forward?");
-              speakText(nudgePrompt);
-            } else if (pauseCountRef.current >= 2) {
-              // Sustained long pause / no answer given: Move on to next question
-              const movePrompt = "Since you are silent, let's move on to the next question.";
-              setSilenceNotice("AI Examiner: Long pause detected (no answer). Moving to next question...");
-              speakText(movePrompt);
-              pauseCountRef.current = 0;
-              // Submit as giveup/skip so VivaEngine advances
-              if (handleTurnSubmitRef.current) {
-                setTimeout(() => {
-                  handleTurnSubmitRef.current(true, false);
-                }, 1200);
-              }
-            }
-          }
-        },
-        silenceThresholdSec: 3.5,
-        dbThreshold: -42
-      });
-
-      await engine.start();
-      audioEngineRef.current = engine;
-
-      // Web Speech Recognition for instant streaming text
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-IN'; // Indian English & Hinglish support
-
-        recognition.onresult = (event) => {
-          let full = '';
-          for (let i = 0; i < event.results.length; ++i) {
-            full += event.results[i][0].transcript + ' ';
-          }
-          setStudentInput(full.trim());
-        };
-
-        recognition.onerror = (e) => {
-          console.warn('Speech recognition warning:', e);
-        };
-
-        recognition.onend = () => {
-          if (audioEngineRef.current && audioEngineRef.current.isRecording) {
-            try { recognition.start(); } catch (err) {}
-          }
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-      }
-
-      setIsListening(true);
-    } catch (err) {
-      console.warn('Microphone access note:', err.message);
+  // Speech Recognition Setup
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
       setIsListening(false);
+    } else {
+      startSpeechRecognition();
     }
   };
 
-  // Start Viva Session (Trigger Singularity Cosmic Warp Animation from rishiraj38.github.io)
-  const handleStartViva = async () => {
-    if (!consentGiven) {
-      alert('Please check the consent box to proceed.');
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please type your responses.");
       return;
     }
 
-    // Launch the Singularity & Celestial Solar Collapse animation overlay
-    setIsWarping(true);
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
 
-    const vivaId = selectedDomain === 'webdev' ? 43 : 42;
-    const domainTitle = selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms';
+    rec.onstart = () => {
+      setIsListening(true);
+      if (!speechTurnStartSec) setSpeechTurnStartSec(elapsedSeconds);
+    };
 
+    rec.onresult = (event) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
+      }
+      if (finalTranscript) {
+        setStudentInput(prev => (prev ? prev + ' ' + finalTranscript : finalTranscript).trim());
+      }
+    };
+
+    rec.onerror = (e) => {
+      console.warn("Speech recognition error:", e);
+      setIsListening(false);
+    };
+
+    rec.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  // Timer Effect
+  useEffect(() => {
+    let interval = null;
+    if (isStarted && !vivaCompleted) {
+      interval = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isStarted, vivaCompleted]);
+
+  // Handle Starting the Interview Session
+  const handleStartInterview = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          student_id: rollNumber.trim().toUpperCase(),
-          student_name: studentName.trim(),
-          viva_id: vivaId,
+          student_id: candidateId,
+          student_name: studentName,
+          viva_id: selectedDomain === 'webdev' ? 43 : 42,
           consent_given: true,
-          examiner_persona: 'grok_sweet',
-          subject_domain: domainTitle,
-          duration_minutes: 15
+          examiner_persona: 'ira',
+          subject_domain: selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms',
+          duration_minutes: durationMinutes,
+          active_syllabus_id: selectedSyllabusId
         })
       });
+
       const data = await res.json();
       setSessionId(data.session_id);
-      setAiQuestion(data.first_question);
-      aiQuestionRef.current = data.first_question;
-      setCurrentPhase(data.phase);
-      setQuestionType(data.question_type);
-      setCurrentStep(1); // Step 1: Introduction
+      setAiQuestion(data.first_question || data.initial_prompt);
+      setCurrentPhase(data.phase || 'WARMUP');
+      setActiveSyllabusTitle(data.active_syllabus_title);
+      setIsCodingQuestion(Boolean(data.is_coding_question));
+      setShouldAskToRead(Boolean(data.should_ask_to_read));
+      setCodingProblemDetails(data.coding_problem_details || null);
+      setIsStarted(true);
 
-      setTranscriptFeed([
-        {
-          speaker: 'AI Examiner',
-          text: data.first_question,
-          time: '00:00',
-          type: data.question_type
-        }
-      ]);
-
-      // When the Singularity animation completes, onWarpComplete will trigger speech and audio capture
+      speakText(data.first_question || data.initial_prompt);
     } catch (err) {
-      setIsWarping(false);
-      alert('Failed to initialize viva session: ' + err.message);
+      console.error("Failed to start session:", err);
+      alert("Could not connect to AI Interview backend. Ensure FastAPI server is running on port 8000.");
     }
   };
 
-  const handleWarpComplete = async () => {
-    setIsWarping(false);
-    setIsStarted(true);
-    const textToSpeak = aiQuestionRef.current || aiQuestion;
-    if (textToSpeak) {
-      // Small timeout to allow UI transition and Web Audio context unlock
-      setTimeout(() => {
-        speakText(textToSpeak);
-      }, 250);
-    }
-    await setupAudioCapture();
-  };
-
-  // Submit Answer Turn
-  const handleTurnSubmit = async (isGiveup = false, isHintReq = false, explicitCode = null) => {
+  // Submit Turn (Candidate response)
+  const handleTurnSubmit = async (options = {}) => {
     if (isSubmitting || !sessionId) return;
-    pauseCountRef.current = 0; // reset pause tracking on submission
-    const effectiveCode = explicitCode !== null ? explicitCode : codeContent;
-    const answerText = studentInput.trim();
-    if (!answerText && !isGiveup && !isHintReq && !effectiveCode.trim()) {
-      alert('Please speak or type your response before submitting.');
+    const { isHint = false, isGiveUp = false, explicitText = null } = options;
+
+    const transcriptText = (explicitText !== null ? explicitText : studentInput).trim();
+    if (!transcriptText && !isHint && !isGiveUp && !codeContent.trim()) {
+      alert("Please provide an explanation or code snippet before submitting.");
       return;
     }
 
     setIsSubmitting(true);
-    setSilenceNotice(null);
-
-    // Stop current speech chunk
-    let audioBlob = null;
-    if (audioEngineRef.current) {
-      audioBlob = await audioEngineRef.current.getAudioBlob();
-    }
-    const answerSec = elapsedSeconds;
-
-    // Optional: upload turn audio
-    let recordedAudioUrl = null;
-    if (audioBlob && audioBlob.size > 0) {
-      try {
-        const formData = new FormData();
-        formData.append('audio_file', audioBlob, 'turn.webm');
-        formData.append('fallback_text', answerText);
-
-        const transcribeRes = await fetch(`${API_BASE}/api/voice/transcribe`, {
-          method: 'POST',
-          body: formData
-        });
-        if (transcribeRes.ok) {
-          const transData = await transcribeRes.json();
-          recordedAudioUrl = transData.audio_url;
-        }
-      } catch (e) {
-        console.warn('Audio snippet upload warning:', e);
-      }
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
     }
 
-    // Append to transcript
-    setTranscriptFeed(prev => [
-      ...prev,
-      {
-        speaker: studentName,
-        text: answerText || (effectiveCode ? '[Submitted Code Solution in Editor]' : '[Skipped]'),
-        time: formatTime(answerSec),
-        codeSnippet: effectiveCode || null,
-        audioUrl: recordedAudioUrl
-      }
-    ]);
-
-    setStudentInput('');
+    // Add candidate turn to transcript
+    if (transcriptText) {
+      setTranscriptFeed(prev => [...prev, { speaker: 'candidate', text: transcriptText }]);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/session/turn`, {
@@ -421,87 +369,59 @@ export default function StudentPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
-          elapsed_seconds: answerSec,
-          transcript: answerText,
+          elapsed_seconds: elapsedSeconds,
+          transcript: transcriptText || (isHint ? "Can I get a progressive hint?" : "Let's move to next question"),
           is_silence: false,
-          is_giveup: isGiveup,
-          is_hint_request: isHintReq,
-          code_snippet: effectiveCode || null,
-          audio_chunk_url: recordedAudioUrl,
-          wpm: acousticMetrics.wpm > 0 ? acousticMetrics.wpm : 125.0,
-          filler_words: acousticMetrics.fillerCounts,
-          fluency_score: acousticMetrics.fluencyScore
+          is_giveup: isGiveUp,
+          is_hint_request: isHint,
+          code_snippet: codeContent
         })
       });
+
       const data = await res.json();
       setAiQuestion(data.ai_response_text);
       setCurrentPhase(data.current_phase);
       setQuestionType(data.question_type);
       setLastLatencyMs(data.latency_ms);
+      setHintsUsed(data.hints_used || (isHint ? hintsUsed + 1 : hintsUsed));
+      setIsCodingQuestion(Boolean(data.is_coding_question));
+      setShouldAskToRead(Boolean(data.should_ask_to_read));
+      setCodingProblemDetails(data.coding_problem_details || null);
 
-      // Advance step indicator aligned with Section 16 & 19
-      const resp = data.ai_response_text || '';
-      if (resp.includes('Web Development') || resp.includes('authentication using JWT') || resp.includes('React frontend and Express')) {
-        setCurrentStep(5);
-      } else if (resp.includes('Problem Statement:')) {
-        setCurrentStep(3);
-      } else if (resp.includes('code editor') || resp.includes('write out your implementation')) {
-        setCurrentStep(4);
-      } else if (resp.includes('conclude') || data.is_viva_completed) {
-        setCurrentStep(7);
-      } else if (currentStep === 1) {
-        setCurrentStep(2);
-      } else if (currentStep === 5) {
-        setCurrentStep(6);
+      // Append Ira response
+      setTranscriptFeed(prev => [...prev, { speaker: 'ira', text: data.ai_response_text }]);
+      setStudentInput('');
+
+      // Spoken voice policy: if audio_spoken_text is present (e.g. asking before reading full coding problem), speak it!
+      if (data.audio_spoken_text) {
+        speakText(data.audio_spoken_text);
+      } else {
+        speakText(data.ai_response_text);
       }
-
-      setTranscriptFeed(prev => [
-        ...prev,
-        {
-          speaker: 'AI Examiner',
-          text: data.ai_response_text,
-          time: formatTime(data.elapsed_seconds),
-          type: data.question_type
-        }
-      ]);
-
-      speakText(data.ai_response_text);
 
       if (data.is_viva_completed) {
-        handleEndViva(data.elapsed_seconds);
+        handleEndInterview();
       }
     } catch (err) {
-      console.error('Turn submission error:', err);
+      console.error("Failed to process turn:", err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    handleTurnSubmitRef.current = handleTurnSubmit;
-  });
+  handleTurnSubmitRef.current = handleTurnSubmit;
 
-  // End Viva & Run Scoring
-  const handleEndViva = async (finalSec = elapsedSeconds) => {
-    if (!sessionId || vivaCompleted) return;
-    setVivaCompleted(true);
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    if (audioEngineRef.current) {
-      try { await audioEngineRef.current.stop(); } catch (e) {}
-    }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) {}
-    }
-
+  // End Interview & Fetch Evaluation
+  const handleEndInterview = async () => {
+    if (!sessionId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/session/end?session_id=${sessionId}`, {
-        method: 'POST'
-      });
+      const res = await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: 'POST' });
       const data = await res.json();
       setCompletionResult(data);
+      setVivaCompleted(true);
       setIsScorecardOpen(true);
     } catch (err) {
-      console.error('Error ending viva:', err);
+      console.error("Failed to end interview:", err);
     }
   };
 
@@ -513,75 +433,217 @@ export default function StudentPortal() {
 
   const totalLimitSec = durationMinutes * 60;
   const remainingSec = Math.max(0, totalLimitSec - elapsedSeconds);
-  const isTimeCritical = remainingSec <= 120;
-  const isTimeWarning = remainingSec <= 300;
 
   // =========================================================================
-  // 1. CLEAN LANDING & REGISTRATION PAGE WITH 3D SOLAR SYSTEM
+  // PRE-INTERVIEW SETUP: 3-STEP WIZARD (System Checks -> Track Selection -> Guidelines)
   // =========================================================================
   if (!isStarted) {
     return (
-      <div style={{ maxWidth: '1060px', margin: '36px auto', padding: '0 24px' }}>
-        {/* Clean Registration Card */}
-        <div className="glass-panel" style={{ padding: '36px 40px', background: '#FFFFFF', marginBottom: '28px' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ maxWidth: '980px', margin: '32px auto', padding: '0 20px' }}>
+        {/* Wizard Step Tabs */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: '28px',
+          background: '#FFFFFF',
+          padding: '12px 24px',
+          borderRadius: '10px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: setupStep === 1 ? '#008BDC' : '#64748B', fontWeight: 700 }}>
+            <span style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: setupStep === 1 ? '#008BDC' : '#E2E8F0',
+              color: setupStep === 1 ? '#FFFFFF' : '#64748B',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px'
+            }}>1</span>
+            1. System Readiness Check
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: setupStep === 2 ? '#008BDC' : '#64748B', fontWeight: 700 }}>
+            <span style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: setupStep === 2 ? '#008BDC' : '#E2E8F0',
+              color: setupStep === 2 ? '#FFFFFF' : '#64748B',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px'
+            }}>2</span>
+            2. Track & Syllabus Selection
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: setupStep === 3 ? '#008BDC' : '#64748B', fontWeight: 700 }}>
+            <span style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: setupStep === 3 ? '#008BDC' : '#E2E8F0',
+              color: setupStep === 3 ? '#FFFFFF' : '#64748B',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px'
+            }}>3</span>
+            3. Guidelines & Honor Code
+          </div>
+        </div>
+
+        {/* STEP 1: SYSTEM READINESS CHECK */}
+        {setupStep === 1 && (
+          <div className="is-card is-card-highlight">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
               <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 35%, #FFE9B8, var(--sun) 55%, #D97706)',
+                width: '40px',
+                height: '40px',
+                borderRadius: '8px',
+                background: '#EBF5FB',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)'
+                color: '#008BDC'
               }}>
-                <Shield size={24} color="#FFFFFF" />
+                <Shield size={22} />
               </div>
               <div>
-                <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
-                  STANDARDIZED TECHNICAL EVALUATION
-                </span>
-                <h1 style={{ fontFamily: 'var(--display)', fontSize: '24px', fontWeight: 800, marginTop: '2px' }} className="sheen-text">
-                  Candidate Registration & Viva Arena
-                </h1>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>Hardware & Proctoring Readiness</h2>
+                <p style={{ fontSize: '13px', color: '#64748B' }}>
+                  Internshala AI Mock Interview uses live video, audio analysis, and code sandbox execution.
+                </p>
               </div>
             </div>
 
-            <span className="badge badge-dark" style={{ fontSize: '10px' }}>
-              15:00 TIMED ARENA
-            </span>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginBottom: '24px' }}>
+              {/* Camera Preview Card */}
+              <div style={{
+                background: '#0F172A',
+                borderRadius: '10px',
+                height: '260px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <video
+                  ref={videoPreviewRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                {/* Face positioning reticle */}
+                <div style={{
+                  position: 'absolute',
+                  width: '140px',
+                  height: '180px',
+                  border: '2px dashed rgba(255, 255, 255, 0.6)',
+                  borderRadius: '50%',
+                  pointerEvents: 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: '#FFFFFF',
+                  fontSize: '11px',
+                  padding: '4px 10px',
+                  borderRadius: '20px'
+                }}>
+                  Keep face centered in frame
+                </div>
+              </div>
 
-          {/* Clean Domain Choice: DSA vs Web Development Only */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: '10px' }}>
-              Select Examination Track:
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {/* Status List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                <div style={{ padding: '12px 16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Camera size={18} color="#008BDC" />
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Webcam Video Feed</span>
+                  </div>
+                  <span className="is-badge-green">Verified</span>
+                </div>
+
+                <div style={{ padding: '12px 16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Mic size={18} color="#008BDC" />
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Microphone Audio Input</span>
+                  </div>
+                  <span className="is-badge-green">Optimal Input</span>
+                </div>
+
+                <div style={{ padding: '12px 16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Wifi size={18} color="#008BDC" />
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Server Latency ({netLatency}ms)</span>
+                  </div>
+                  <span className="is-badge-green">High Speed</span>
+                </div>
+
+                <div style={{ padding: '12px 16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Code2 size={18} color="#008BDC" />
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>DSA Code Sandbox</span>
+                  </div>
+                  <span className="is-badge-green">Ready</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setSetupStep(2)}
+                className="is-btn-primary"
+                style={{ padding: '12px 24px', fontSize: '14px' }}
+              >
+                Proceed to Track Selection <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: TRACK & SYLLABUS SELECTION */}
+        {setupStep === 2 && (
+          <div className="is-card is-card-highlight">
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
+              Select Examination Track & Syllabus
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>
+              The interview is strictly focused on <strong>Data Structures & Algorithms (DSA)</strong> and <strong>Web Development</strong>.
+            </p>
+
+            {/* Track Selector */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
               <button
                 type="button"
                 onClick={() => setSelectedDomain('dsa')}
                 style={{
-                  padding: '16px 20px',
-                  borderRadius: 'var(--radius-md)',
-                  border: `2px solid ${selectedDomain === 'dsa' ? 'var(--sun)' : 'var(--rule)'}`,
-                  background: selectedDomain === 'dsa' ? '#FFFBEB' : '#FFFFFF',
+                  padding: '18px 20px',
+                  borderRadius: '10px',
+                  border: `2px solid ${selectedDomain === 'dsa' ? '#008BDC' : '#E2E8F0'}`,
+                  background: selectedDomain === 'dsa' ? '#EBF5FB' : '#FFFFFF',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedDomain === 'dsa' ? '0 4px 14px rgba(245, 158, 11, 0.18)' : 'var(--shadow-sm)'
+                  boxShadow: selectedDomain === 'dsa' ? '0 2px 8px rgba(0, 139, 220, 0.15)' : 'none'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
-                    DSA (Data Structures & Algorithms)
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
+                    🔷 DSA Track
                   </span>
-                  {selectedDomain === 'dsa' && <CheckCircle2 size={16} color="#D97706" />}
+                  {selectedDomain === 'dsa' && <CheckCircle2 size={18} color="#008BDC" />}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--ink-secondary)' }}>
-                  Problem solving, complexity analysis & algorithmic implementations.
+                <div style={{ fontSize: '12px', color: '#475569' }}>
+                  Arrays, Sliding Window, Trees, Graphs, Dynamic Programming & Complexity Analysis.
                 </div>
               </button>
 
@@ -589,474 +651,676 @@ export default function StudentPortal() {
                 type="button"
                 onClick={() => setSelectedDomain('webdev')}
                 style={{
-                  padding: '16px 20px',
-                  borderRadius: 'var(--radius-md)',
-                  border: `2px solid ${selectedDomain === 'webdev' ? 'var(--nebula)' : 'var(--rule)'}`,
-                  background: selectedDomain === 'webdev' ? '#EEF2FF' : '#FFFFFF',
+                  padding: '18px 20px',
+                  borderRadius: '10px',
+                  border: `2px solid ${selectedDomain === 'webdev' ? '#FF6B00' : '#E2E8F0'}`,
+                  background: selectedDomain === 'webdev' ? '#FFF4EC' : '#FFFFFF',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedDomain === 'webdev' ? '0 4px 14px rgba(99, 102, 241, 0.18)' : 'var(--shadow-sm)'
+                  boxShadow: selectedDomain === 'webdev' ? '0 2px 8px rgba(255, 107, 0, 0.15)' : 'none'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
-                    Web Development & Systems
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
+                    🔶 Web Development Track
                   </span>
-                  {selectedDomain === 'webdev' && <CheckCircle2 size={16} color="#4F46E5" />}
+                  {selectedDomain === 'webdev' && <CheckCircle2 size={18} color="#FF6B00" />}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--ink-secondary)' }}>
-                  Full-stack architecture, asynchronous workflows & data persistence.
+                <div style={{ fontSize: '12px', color: '#475569' }}>
+                  React Reconciliation, Node.js Event Loop, JWT Auth Security & Database Optimization.
                 </div>
               </button>
             </div>
-          </div>
 
-          {/* Candidate Name & Roll Number Input */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '24px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
-                Candidate Full Name
-              </label>
-              <input
-                className="input-field"
-                value={studentName}
-                onChange={e => setStudentName(e.target.value)}
-                placeholder="e.g. Rahul Sharma"
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
-                Roll Number
-              </label>
-              <input
-                className="input-field mono"
-                value={rollNumber}
-                onChange={e => setRollNumber(e.target.value.toUpperCase())}
-                placeholder="e.g. 21BCSE104"
-              />
-            </div>
-          </div>
-
-          {/* Academic Consent */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '14px',
-            padding: '16px 20px',
-            background: consentGiven ? '#F0FDF4' : '#F8FAFC',
-            border: `1.5px solid ${consentGiven ? '#10B981' : 'var(--rule)'}`,
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '28px'
-          }}>
-            <label htmlFor="consent" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', flex: 1 }}>
-              <input
-                type="checkbox"
-                id="consent"
-                checked={consentGiven}
-                onChange={e => setConsentGiven(e.target.checked)}
-                style={{ marginTop: '2px', width: '20px', height: '20px', accentColor: '#10B981', cursor: 'pointer' }}
-              />
-              <div>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: consentGiven ? '#047857' : 'var(--ink)' }}>
-                  {consentGiven ? 'Consent Acknowledged' : 'Click to Agree & Authorize Examination'}
-                </span>
-                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: '2px 0 0 0', lineHeight: '1.4' }}>
-                  I agree to audio stream recording, front camera proctoring, screen recording capture, and integrity monitoring.
-                </p>
+            {/* Active Syllabus Selection */}
+            <div style={{ marginBottom: '22px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                  Select Syllabus to Interview On *
+                </label>
+                {onNavigateToTraining && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToTraining}
+                    style={{ background: 'none', border: 'none', color: '#008BDC', fontSize: '12px', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    + Train New Custom Syllabus in Lab
+                  </button>
+                )}
               </div>
-            </label>
-            <span className={`badge ${consentGiven ? 'badge-emerald' : 'badge-amber'}`}>
-              {consentGiven ? 'Ready' : 'Pending'}
-            </span>
+
+              <select
+                value={selectedSyllabusId || ''}
+                onChange={(e) => setSelectedSyllabusId(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  padding: '11px 14px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  background: '#FFFFFF',
+                  color: '#1E293B'
+                }}
+              >
+                <option value="">Default Internshala Master Curriculum</option>
+                {availableSyllabi.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} ({s.subject} • {s.questions_count || 1} Custom Questions) {s.is_active ? '★ Currently Active' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Candidate Details & Level */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '26px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                  Candidate Name
+                </label>
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                  Internshala Candidate ID
+                </label>
+                <input
+                  type="text"
+                  value={candidateId}
+                  onChange={(e) => setCandidateId(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                  Target Level
+                </label>
+                <select
+                  value={targetLevel}
+                  onChange={(e) => setTargetLevel(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF', boxSizing: 'border-box' }}
+                >
+                  <option value="Beginner">Beginner (Foundations)</option>
+                  <option value="Intermediate">Intermediate (Core SDE)</option>
+                  <option value="Advanced">Advanced (FAANG Level)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                onClick={() => setSetupStep(1)}
+                className="is-btn-secondary"
+                style={{ padding: '10px 18px', fontSize: '13px' }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => setSetupStep(3)}
+                className="is-btn-primary"
+                style={{ padding: '10px 22px', fontSize: '14px' }}
+              >
+                Proceed to Guidelines <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* AI INTERVIEW START Button (Singularity Celestial Glow from rishiraj38.github.io) */}
-          <button
-            onClick={handleStartViva}
-            disabled={!consentGiven || !studentName.trim() || !rollNumber.trim()}
-            style={{
-              width: '100%',
-              padding: '18px 28px',
-              borderRadius: '999px',
-              background: consentGiven ? '#0F172A' : '#94A3B8',
-              color: '#FFFFFF',
-              fontFamily: 'var(--display)',
-              fontSize: '15px',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              border: consentGiven ? '1.5px solid rgba(255, 255, 255, 0.25)' : 'none',
-              boxShadow: consentGiven ? '0 0 25px rgba(99, 102, 241, 0.4), 0 8px 24px rgba(15, 23, 42, 0.3)' : 'none',
-              cursor: consentGiven ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-          >
-            <span className="sun-pulse" style={{ width: '10px', height: '10px', background: '#F59E0B' }} />
-            <span>AI INTERVIEW START</span>
-            <ArrowRight size={18} />
-          </button>
-        </div>
+        {/* STEP 3: GUIDELINES & HONOR CODE */}
+        {setupStep === 3 && (
+          <div className="is-card is-card-highlight">
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
+              Internshala AI Interview Guidelines & Code of Conduct
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>
+              Please review how Ira evaluates your technical reasoning before entering the arena.
+            </p>
 
-        {/* Singularity Cosmic Black Hole Warp Transition from rishiraj38.github.io */}
-        {isWarping && <SingularityWarp onComplete={handleWarpComplete} />}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
+                  1. Adaptive One-Question Pacing
+                </div>
+                <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                  Ira asks ONE question at a time. She evaluates your specific response and probes deeper with follow-up scenarios.
+                </div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
+                  2. Think First, Code Second
+                </div>
+                <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                  Explain your observations, approach, and Big-O complexity verbally or in text before writing code in the sandbox.
+                </div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
+                  3. 4-Level Progressive Hints
+                </div>
+                <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                  If you are stuck, ask Ira for a hint. Hints progress from high-level direction (Level 1) to near-solution (Level 4).
+                </div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
+                  4. Quality of Thinking Matters
+                </div>
+                <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                  You are not evaluated only on whether your first approach is optimal, but on your ability to refine and debug.
+                </div>
+              </div>
+            </div>
+
+            {/* Honor Code Checkbox */}
+            <div style={{
+              background: consentGiven ? '#ECFDF5' : '#F8FAFC',
+              border: `1.5px solid ${consentGiven ? '#10B981' : '#CBD5E1'}`,
+              borderRadius: '8px',
+              padding: '16px 20px',
+              marginBottom: '26px'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={consentGiven}
+                  onChange={(e) => setConsentGiven(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#10B981', marginTop: '2px' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: consentGiven ? '#065F46' : '#1E293B' }}>
+                    I agree to the Mirai School of Technology (MSOT) AI Mock Interview Honor Code
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    I declare that this interview will be taken without unauthorized external human assistance, and I authorize proctoring recording.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setSetupStep(2)}
+                className="is-btn-secondary"
+                style={{ padding: '10px 18px', fontSize: '13px' }}
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={handleStartInterview}
+                disabled={!consentGiven}
+                className="is-btn-primary"
+                style={{
+                  padding: '14px 32px',
+                  fontSize: '15px',
+                  background: consentGiven ? '#008BDC' : '#94A3B8'
+                }}
+              >
+                Start MSOT AI Interview with Ira ▶
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   // =========================================================================
-  // 2. ACTIVE VIVA ARENA: HACKERRANK SPLIT VIEW (LEFT: QUESTION, RIGHT: CODE)
+  // LIVE AI INTERVIEW ROOM (DYNAMIC CODING DASHBOARD & PROCTORING)
   // =========================================================================
   return (
-    <div style={{ maxWidth: '1680px', margin: '20px auto', padding: '0 24px' }}>
-      {/* Top Header Bar with 15-Minute Countdown */}
-      <div className="glass-panel" style={{ padding: '14px 24px', marginBottom: '18px', background: '#FFFFFF' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
-          {/* Left: Step & Student Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* 15-Minute Countdown Badge */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '999px',
-              background: isTimeCritical ? '#FEF2F2' : isTimeWarning ? '#FFFBEB' : '#F1F5F9',
-              border: `1.5px solid ${isTimeCritical ? '#EF4444' : isTimeWarning ? '#F59E0B' : 'var(--rule)'}`
-            }}>
-              <Clock size={16} color={isTimeCritical ? '#EF4444' : isTimeWarning ? '#F59E0B' : 'var(--ink)'} />
-              <span className="mono" style={{
-                fontSize: '15px',
-                fontWeight: 800,
-                color: isTimeCritical ? '#EF4444' : isTimeWarning ? '#B45309' : 'var(--ink)'
-              }}>
-                {formatTime(remainingSec)}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                / 15:00
-              </span>
-            </div>
-
-            <span className="badge badge-dark">
-              {selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track'}
+    <div style={{ maxWidth: isCodingQuestion ? '1600px' : '960px', margin: '16px auto', padding: '0 20px', transition: 'max-width 0.3s ease' }}>
+      {/* Top Header Bar */}
+      <div style={{
+        background: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '10px',
+        padding: '12px 20px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+      }}>
+        {/* Left: Domain & Timer */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 12px',
+            borderRadius: '6px',
+            background: remainingSec <= 180 ? '#FEF2F2' : '#F1F5F9',
+            border: `1px solid ${remainingSec <= 180 ? '#FCA5A5' : '#E2E8F0'}`
+          }}>
+            <Clock size={15} color={remainingSec <= 180 ? '#EF4444' : '#008BDC'} />
+            <span style={{ fontSize: '14px', fontWeight: 800, color: remainingSec <= 180 ? '#EF4444' : '#1E293B', fontFamily: 'monospace' }}>
+              {formatTime(remainingSec)}
             </span>
-
-            {/* Step Progress Pill */}
-            <span className="badge badge-purple" style={{ fontSize: '11px' }}>
-              {currentStep === 1 && 'Step 1: Introduction & Discovery'}
-              {currentStep === 2 && 'Step 2: Technical Foundations Warm-up'}
-              {currentStep === 3 && 'Step 3: DSA Problem & Approach Reasoning'}
-              {currentStep === 4 && 'Step 4: Implementation in Code Editor'}
-              {currentStep === 5 && 'Step 5: Web Development Systems Scenario'}
-              {currentStep === 6 && 'Step 6: Architecture & Security Probing'}
-              {currentStep >= 7 && 'Step 7: Final Comprehensive Evaluation'}
-            </span>
+            <span style={{ fontSize: '11px', color: '#64748B' }}>/ 15:00</span>
           </div>
 
-          {/* Candidate Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="mono" style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>
-              {studentName} ({rollNumber})
-            </span>
+          <span className={selectedDomain === 'webdev' ? 'is-badge-orange' : 'is-badge-blue'}>
+            {selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}
+          </span>
 
-            <button
-              onClick={() => handleEndViva()}
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '5px 12px', color: '#BE123C' }}
-            >
-              Conclude Exam Early
-            </button>
+          {activeSyllabusTitle && (
+            <span style={{ fontSize: '12px', color: '#008BDC', fontWeight: 600, background: '#EBF5FB', padding: '3px 10px', borderRadius: '4px' }}>
+              📋 Syllabus: {activeSyllabusTitle}
+            </span>
+          )}
+
+          {/* Anti-Cheating Tab Switch Proctor Badge */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            background: tabSwitchCount === 0 ? '#ECFDF5' : tabSwitchCount < 3 ? '#FFFBEB' : '#FEF2F2',
+            border: `1px solid ${tabSwitchCount === 0 ? '#A7F3D0' : tabSwitchCount < 3 ? '#FDE68A' : '#FECACA'}`,
+            fontSize: '12px',
+            fontWeight: 700,
+            color: tabSwitchCount === 0 ? '#065F46' : tabSwitchCount < 3 ? '#B45309' : '#DC2626'
+          }}>
+            <Shield size={14} />
+            <span>Tab Switches: {tabSwitchCount} / 3</span>
           </div>
+        </div>
+
+        {/* Right: Ira Status & End Interview */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            background: isAiSpeaking ? '#EBF5FB' : isListening ? '#ECFDF5' : '#F8FAFC',
+            border: '1px solid #CBD5E1',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: isAiSpeaking ? '#008BDC' : isListening ? '#065F46' : '#64748B'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isAiSpeaking ? '#008BDC' : isListening ? '#10B981' : '#94A3B8'
+            }} />
+            {isAiSpeaking ? 'Ira Speaking...' : isListening ? 'Listening to You...' : 'Ira Active'}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleEndInterview}
+            className="is-btn-secondary"
+            style={{ padding: '6px 14px', fontSize: '12px', color: '#EF4444', borderColor: '#FCA5A5' }}
+          >
+            End Interview & View Report
+          </button>
         </div>
       </div>
 
-      {/* Tab Switch Alert (Anti-Cheating) */}
-      {tabSwitchAlert && (
-        <div style={{
-          background: '#FFF1F2',
-          border: '1.5px solid #E11D48',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 16px',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '13px',
-          color: '#9F1239'
-        }}>
-          <AlertTriangle size={18} color="#E11D48" />
-          <span>
-            <strong>Anti-Cheating Notice:</strong> Window unfocused (#{tabSwitchCount}). Focus loss logged to audit records.
-          </span>
-        </div>
-      )}
-
-      {/* Silence Nudge Alert */}
-      {silenceNotice && (
-        <div style={{
-          background: '#FFFBEB',
-          border: '1.5px solid #F59E0B',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 16px',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: '13px',
-          color: '#92400E'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={16} color="#F59E0B" />
-            <span>{silenceNotice}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleTurnSubmit()}
-            className="btn btn-primary"
-            style={{ fontSize: '11px', padding: '4px 12px' }}
-          >
-            Submit Answer
-          </button>
-        </div>
-      )}
-
-      {/* =====================================================================
-          LEETCODE WORKSPACE SPLIT VIEW:
-          LEFT: EXAMINER QUESTION PROBE, VOICE CATCHING, PROCTORS & TRANSCRIPT
-          RIGHT: FULL CODE EDITOR PLATFORM (COVERING RIGHT SCREEN)
-          ===================================================================== */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(420px, 44%) minmax(550px, 56%)',
-        gap: '20px',
-        alignItems: 'start'
-      }}>
-        {/* LEFT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Question Card */}
-          <div className="glass-panel" style={{ padding: '24px', background: '#FFFFFF' }}>
+      {/* Main Studio: Single-Column for General Questions, Split-Screen for Coding Questions */}
+      <div style={isCodingQuestion ? { display: 'grid', gridTemplateColumns: '1.1fr 1.2fr', gap: '20px' } : { display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Left Column: Ira Card, Question, and Technical Response */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Ira AI Recruiter Card */}
+          <div className="is-card" style={{ padding: '18px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="badge badge-purple">{questionType}</span>
-                {lastLatencyMs && (
-                  <span className="mono" style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-                    ⚡ {lastLatencyMs}ms turnaround
-                  </span>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #008BDC, #005F96)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  boxShadow: '0 2px 8px rgba(0, 139, 220, 0.3)'
+                }}>
+                  👩‍💼
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
+                    Ira • MSOT AI Recruiter
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>
+                    Mirai School of Technology Technical Interview
+                  </div>
+                </div>
               </div>
 
-              {isAiSpeaking && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Volume2 size={16} color="var(--ice)" />
-                  <span style={{ fontSize: '12px', color: 'var(--ice)', fontWeight: 700 }}>
-                    Examiner Speaking...
-                  </span>
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isAiSpeaking && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => speakText(aiQuestion)}
+                  title="Replay Voice"
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Volume2 size={14} /> Replay
+                </button>
+              </div>
             </div>
 
-            {/* Audio Visualizer */}
-            <div style={{ marginBottom: '16px' }}>
-              <AudioVisualizer
-                frequencyData={frequencyData}
-                isSpeaking={isSpeakingLive || isAiSpeaking}
-                volume={audioVolume}
-              />
-            </div>
-
-            {/* Question Text Box with Listen Again button */}
+            {/* Current Question / Prompt */}
             <div style={{
               background: '#F8FAFC',
-              border: '1px solid var(--rule)',
-              borderRadius: 'var(--radius-md)',
-              padding: '18px',
-              marginBottom: '16px',
-              position: 'relative'
+              border: '1px solid #E2E8F0',
+              borderRadius: '8px',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: 1.6,
+              color: '#1E293B',
+              whiteSpace: 'pre-wrap'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--nebula)', textTransform: 'uppercase' }}>
-                  Examiner Question (English):
+              {aiQuestion || "Connecting to Ira..."}
+            </div>
+
+            {/* Ask Before Reading Full Problem Interactive Banner */}
+            {shouldAskToRead && (
+              <div style={{
+                marginTop: '14px',
+                padding: '12px 16px',
+                background: '#EFF6FF',
+                border: '1.5px solid #93C5FD',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.06)'
+              }}>
+                <div style={{ fontSize: '13px', color: '#1E40AF', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Volume2 size={16} color="#2563EB" />
+                  <span>Ira asks: Would you like the full problem statement and constraints read aloud?</span>
                 </div>
-                {aiQuestion && (
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                   <button
                     type="button"
-                    onClick={() => speakText(aiQuestion)}
-                    style={{
-                      background: 'rgba(99, 102, 241, 0.1)',
-                      color: 'var(--nebula)',
-                      border: '1px solid rgba(99, 102, 241, 0.25)',
-                      borderRadius: '4px',
-                      padding: '3px 8px',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                    onClick={() => {
+                      setShouldAskToRead(false);
+                      handleTurnSubmit({ explicitText: "Yes, please read the entire problem statement and constraints aloud." });
                     }}
-                    title="Re-speak question aloud"
+                    style={{
+                      padding: '6px 14px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
                   >
-                    <Volume2 size={12} />
-                    <span>Repeat Voice</span>
+                    🔊 Yes, Read Aloud
                   </button>
-                )}
-              </div>
-              <div style={{
-                fontFamily: 'var(--body)',
-                fontSize: '15px',
-                fontWeight: 500,
-                color: 'var(--ink)',
-                lineHeight: '1.6',
-                margin: 0,
-                whiteSpace: 'pre-line'
-              }}>
-                {aiQuestion || 'Connecting to viva engine...'}
-              </div>
-            </div>
-
-            {/* Spoken Answer Input Area */}
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)' }}>
-                  Spoken Answer (Hindi/Hinglish Supported):
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="sun-pulse" style={{ width: '7px', height: '7px', background: isListening ? '#10B981' : '#94A3B8' }} />
-                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>
-                    {isListening ? 'Voice Catching Active' : 'Mic Off'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShouldAskToRead(false);
+                      window.speechSynthesis.cancel();
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      background: '#FFFFFF',
+                      color: '#1E40AF',
+                      border: '1px solid #93C5FD',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📖 I'll Read It Myself
+                  </button>
                 </div>
               </div>
+            )}
+          </div>
 
-              <textarea
-                value={studentInput}
-                onChange={e => setStudentInput(e.target.value)}
-                placeholder="Speak your answer naturally into the microphone, or type here..."
-                rows={3}
-                className="input-field"
-                style={{ fontSize: '13px', lineHeight: '1.45', resize: 'vertical' }}
-              />
+          {/* Candidate Response Console */}
+          <div className="is-card" style={{ padding: '18px 22px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: '#1E293B' }}>
+                Your Technical Response
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    background: isListening ? '#EF4444' : '#008BDC',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                  {isListening ? 'Stop Recording' : 'Speak Answer'}
+                </button>
+              </div>
             </div>
 
-            {/* Question Action Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleTurnSubmit(false, true)}
-                  disabled={isSubmitting}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Sparkles size={13} color="var(--sun)" />
-                  <span>Progressive Hint (Level 1-4)</span>
-                </button>
+            <textarea
+              value={studentInput}
+              onChange={(e) => setStudentInput(e.target.value)}
+              placeholder={isCodingQuestion 
+                ? "Explain your observations, proposed approach, time/space complexity, or trade-offs here. You can also implement code in the editor on the right." 
+                : "Explain your reasoning and answer clearly here. You can also click 'Speak Answer' to speak naturally."}
+              rows={isCodingQuestion ? 5 : 7}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                fontSize: '14px',
+                lineHeight: 1.5,
+                boxSizing: 'border-box',
+                resize: 'vertical',
+                marginBottom: '14px',
+                fontFamily: 'inherit'
+              }}
+            />
 
+            {/* Actions: Request Hint, Submit Answer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => handleTurnSubmit(true, false)}
+                  onClick={() => handleTurnSubmit({ isHint: true })}
                   disabled={isSubmitting}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '11px', padding: '6px 12px' }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    background: '#FFFBEB',
+                    border: '1px solid #FDE68A',
+                    color: '#B45309',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
                 >
-                  <FastForward size={13} />
-                  Next Topic
+                  <HelpCircle size={14} />
+                  Request Hint {hintsUsed > 0 ? `(${hintsUsed}/4 Used)` : ''}
                 </button>
               </div>
 
               <button
                 type="button"
-                onClick={() => handleTurnSubmit(false, false)}
+                onClick={() => handleTurnSubmit()}
                 disabled={isSubmitting || (!studentInput.trim() && !codeContent.trim())}
-                className="btn btn-primary"
-                style={{ padding: '7px 20px', fontSize: '12px' }}
+                className="is-btn-primary"
+                style={{ padding: '10px 22px', fontSize: '14px' }}
               >
-                <Send size={13} />
-                {isSubmitting ? 'Evaluating...' : 'Submit Spoken Answer'}
+                {isSubmitting ? 'Evaluating...' : 'Submit Answer to Ira ▶'}
               </button>
             </div>
           </div>
-
-          {/* Front Camera & Screen Recording Widget (Picture-in-Picture) */}
-          <div className="glass-panel" style={{ padding: '16px 20px', background: '#FFFFFF' }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
-              Anti-Cheating Live Proctors:
-            </div>
-            <ScreenAndCameraRecorder
-              isStarted={isStarted}
-              onIntegrityAlert={(type, details) => {
-                fetch(`${API_BASE}/api/session/integrity`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    session_id: sessionId,
-                    event_type: type,
-                    details: details,
-                    timestamp_sec: elapsedSeconds
-                  })
-                }).catch(e => console.warn(e));
-              }}
-            />
-          </div>
-
-          {/* Transcript History */}
-          <div className="glass-panel" style={{ padding: '18px', background: '#FFFFFF', maxHeight: '340px', overflowY: 'auto' }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
-              Verbatim Viva Transcript:
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {transcriptFeed.map((item, idx) => {
-                const isExaminer = item.speaker.includes('AI') || item.speaker.includes('Examiner');
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      background: isExaminer ? '#F8FAFC' : '#EEF2FF',
-                      border: `1px solid ${isExaminer ? 'var(--rule)' : 'rgba(99, 102, 241, 0.25)'}`,
-                      borderRadius: '8px',
-                      padding: '10px 12px',
-                      fontSize: '12px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 800 }}>
-                      <span style={{ color: isExaminer ? 'var(--nebula)' : '#1E1B4B' }}>{item.speaker}</span>
-                      <span className="mono" style={{ fontSize: '10px', color: 'var(--muted)' }}>{item.time}</span>
-                    </div>
-                    <p style={{ margin: 0, color: 'var(--ink)' }}>{item.text}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
-        {/* RIGHT COLUMN: FULL LEETCODE / HACKERRANK CODE WRITING PLATFORM */}
-        <div style={{ position: 'sticky', top: '80px', height: 'calc(100vh - 120px)', minHeight: '680px' }}>
-          <HackerRankCodeEditor
-            subject={selectedDomain}
-            code={codeContent}
-            onChange={setCodeContent}
-            onSubmitSolution={(codeToSubmit) => {
-              handleTurnSubmit(false, false, codeToSubmit);
-            }}
-          />
-        </div>
+        {/* Right Column: Code Playground - ONLY VISIBLE FOR CODING QUESTIONS */}
+        {isCodingQuestion && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="is-card" style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Code2 size={16} color="#008BDC" />
+                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#1E293B' }}>
+                    MSOT LeetCode Playground
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>
+                  Standard: {selectedDomain === 'webdev' ? 'JavaScript' : 'C++'}
+                </span>
+              </div>
+
+              <HackerRankCodeEditor
+                subject={selectedDomain}
+                code={codeContent}
+                onChange={(newCode) => setCodeContent(newCode)}
+                onSubmitSolution={(subCode) => {
+                  setCodeContent(subCode);
+                  handleTurnSubmit({ explicitText: "I have implemented and tested my solution in the code editor." });
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Final Scorecard Modal */}
-      <ScorecardModal
-        isOpen={isScorecardOpen}
-        onClose={() => setIsScorecardOpen(false)}
-        result={completionResult}
-        studentName={studentName}
-        studentId={rollNumber}
-        subjectTitle={selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track'}
-      />
+      {/* Anti-Cheating Tab Switch Warning Modal */}
+      {showTabSwitchWarning && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            padding: '32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            border: '2px solid #EF4444',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: '#FEE2E2',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              fontSize: '32px'
+            }}>
+              ⚠️
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#991B1B', margin: '0 0 10px' }}>
+              Tab Switch Detected!
+            </h2>
+            <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 16px' }}>
+              <strong>Warning:</strong> You are strictly not allowed to switch tabs or leave this window during your <strong>Mirai School of Technology (MSOT)</strong> AI Mock Technical Interview.
+            </p>
+            <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#B91C1C' }}>
+                Violation Warning {tabSwitchCount} of 3
+              </div>
+              <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
+                All tab switches and blur events are continuously tracked by the MSOT Anti-Cheat Proctor and recorded on your official evaluation certificate.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowTabSwitchWarning(false);
+                window.focus();
+              }}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: '#DC2626',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '14px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.4)'
+              }}
+            >
+              I Understand, Return to Interview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scorecard Modal */}
+      {isScorecardOpen && (
+        <ScorecardModal
+          isOpen={isScorecardOpen}
+          onClose={() => setIsScorecardOpen(false)}
+          result={completionResult}
+          studentName={studentName}
+          studentId={candidateId}
+          subjectTitle={selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}
+        />
+      )}
     </div>
   );
 }

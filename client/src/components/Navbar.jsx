@@ -1,147 +1,192 @@
 import React from 'react';
-import { Mic, GraduationCap, Server, Radio, Code2, Sparkles, Layers } from 'lucide-react';
+import { Mic, BookOpen, Award, CheckCircle2 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   return (
-    <>
-      {/* Top Cosmic Gradient Beam */}
-      <div className="top-progress-beam" />
+    <header style={{
+      borderBottom: '1px solid #E2E8F0',
+      background: '#FFFFFF',
+      position: 'sticky',
+      top: 0,
+      zIndex: 50,
+      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+    }}>
+      {/* Top subtle blue accent strip */}
+      <div style={{ height: '3px', background: 'linear-gradient(90deg, #008BDC, #0073B6, #FF6B00)' }} />
 
-      <header style={{
-        borderBottom: '1px solid var(--rule)',
-        background: 'rgba(255, 255, 255, 0.94)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        padding: '0 28px',
-        boxShadow: 'var(--shadow-sm)'
+      <div style={{
+        maxWidth: '1440px',
+        margin: '0 auto',
+        height: '68px',
+        padding: '0 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '20px'
       }}>
-        <div style={{
-          maxWidth: '1440px',
-          margin: '0 auto',
-          height: '74px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '20px'
-        }}>
-          {/* Brand: Sun Pulse & Unbounded Sheen */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #FFE9B8, var(--sun) 55%, #D97706)',
-              boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+        {/* MSOT Brand Logo & Product Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', cursor: 'pointer' }} onClick={() => setActiveTab('interview')}>
+            <span style={{
+              fontSize: '24px',
+              fontWeight: 900,
+              color: '#008BDC',
+              letterSpacing: '-0.5px',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
             }}>
-              <Radio size={19} color="#FFFFFF" />
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
-                  TECHNICAL VIVA ARENA
-                </span>
-                <span className="badge badge-dark" style={{ fontSize: '9px', padding: '2px 8px' }}>
-                  DSA & WEB DEV
-                </span>
-              </div>
-              <h1 style={{
-                fontFamily: 'var(--display)',
-                fontWeight: '800',
-                fontSize: '18px',
-                letterSpacing: '-0.03em',
-                lineHeight: '1.2',
-                marginTop: '2px'
-              }} className="sheen-text">
-                AI INTERVIEWER <span style={{ color: 'var(--ice)' }}>• CORE</span>
-              </h1>
-            </div>
+              MSOT
+            </span>
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: '#FF6B00',
+              display: 'inline-block',
+              marginLeft: '2px',
+              marginBottom: '2px'
+            }} />
           </div>
 
-          {/* Navigation Tabs */}
-          <nav style={{
-            display: 'flex',
-            gap: '6px',
-            background: '#F1F5F9',
-            padding: '4px',
-            borderRadius: '999px',
-            border: '1px solid var(--rule)'
-          }}>
-            <button
-              onClick={() => setActiveTab('student')}
-              className={`btn ${activeTab === 'student' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                fontSize: '12px',
-                padding: '7px 18px',
-                border: 'none',
-                background: activeTab === 'student' ? '#0F172A' : 'transparent',
-                color: activeTab === 'student' ? '#FFFFFF' : 'var(--ink-secondary)',
-                boxShadow: activeTab === 'student' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
-              }}
-            >
-              <Mic size={14} color={activeTab === 'student' ? '#F59E0B' : 'currentColor'} />
-              Student Viva Portal
-            </button>
+          <div style={{ height: '24px', width: '1px', background: '#CBD5E1' }} />
 
-            <button
-              onClick={() => setActiveTab('faculty')}
-              className={`btn ${activeTab === 'faculty' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                fontSize: '12px',
-                padding: '7px 18px',
-                border: 'none',
-                background: activeTab === 'faculty' ? '#0F172A' : 'transparent',
-                color: activeTab === 'faculty' ? '#FFFFFF' : 'var(--ink-secondary)',
-                boxShadow: activeTab === 'faculty' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
-              }}
-            >
-              <GraduationCap size={14} color={activeTab === 'faculty' ? '#6366F1' : 'currentColor'} />
-              Faculty Command Center
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: '#EBF5FB',
+              color: '#0073B6',
+              fontWeight: 700,
+              fontSize: '12px',
+              padding: '3px 9px',
+              borderRadius: '4px',
+              border: '1px solid #BAE0F7'
+            }}>
+              Mirai School of Technology AI Interviewer
+            </span>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
+              Powered by <strong style={{ color: '#008BDC' }}>Ira • MSOT AI Recruiter</strong>
+            </span>
+          </div>
+        </div>
 
-            <button
-              onClick={() => setActiveTab('scalability')}
-              className={`btn ${activeTab === 'scalability' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                fontSize: '12px',
-                padding: '7px 18px',
-                border: 'none',
-                background: activeTab === 'scalability' ? '#0F172A' : 'transparent',
-                color: activeTab === 'scalability' ? '#FFFFFF' : 'var(--ink-secondary)',
-                boxShadow: activeTab === 'scalability' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
-              }}
-            >
-              <Server size={14} color={activeTab === 'scalability' ? '#0284C7' : 'currentColor'} />
-              Telemetry & Load
-            </button>
-          </nav>
-
-          {/* Right Status Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
+        {/* Internshala Navigation Tabs */}
+        <nav style={{
+          display: 'flex',
+          gap: '4px',
+          background: '#F1F5F9',
+          padding: '4px',
+          borderRadius: '8px',
+          border: '1px solid #E2E8F0'
+        }}>
+          <button
+            onClick={() => setActiveTab('interview')}
+            style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '999px',
-              background: '#FFFFFF',
-              border: '1px solid var(--rule)',
-              boxShadow: 'var(--shadow-sm)'
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '8px 18px',
+              borderRadius: '6px',
+              border: 'none',
+              background: activeTab === 'interview' ? '#008BDC' : 'transparent',
+              color: activeTab === 'interview' ? '#FFFFFF' : '#475569',
+              boxShadow: activeTab === 'interview' ? '0 2px 6px rgba(0, 139, 220, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Mic size={15} color={activeTab === 'interview' ? '#FFFFFF' : '#64748B'} />
+            Mock Interview Room
+          </button>
+
+          <button
+            onClick={() => setActiveTab('training')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '8px 18px',
+              borderRadius: '6px',
+              border: 'none',
+              background: activeTab === 'training' ? '#008BDC' : 'transparent',
+              color: activeTab === 'training' ? '#FFFFFF' : '#475569',
+              boxShadow: activeTab === 'training' ? '0 2px 6px rgba(0, 139, 220, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <BookOpen size={15} color={activeTab === 'training' ? '#FFFFFF' : '#64748B'} />
+            Syllabus & AI Training Lab
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reports')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '8px 18px',
+              borderRadius: '6px',
+              border: 'none',
+              background: activeTab === 'reports' ? '#008BDC' : 'transparent',
+              color: activeTab === 'reports' ? '#FFFFFF' : '#475569',
+              boxShadow: activeTab === 'reports' ? '0 2px 6px rgba(0, 139, 220, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Award size={15} color={activeTab === 'reports' ? '#FFFFFF' : '#64748B'} />
+            Evaluation Reports
+          </button>
+        </nav>
+
+        {/* Candidate & Ira Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 12px',
+            borderRadius: '20px',
+            background: '#ECFDF5',
+            border: '1px solid #A7F3D0'
+          }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+            <span style={{ fontSize: '12px', color: '#065F46', fontWeight: 600 }}>
+              Ira • Online
+            </span>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 12px',
+            borderRadius: '6px',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            fontSize: '12px',
+            color: '#334155',
+            fontWeight: 500
+          }}>
+            <span style={{
+              width: '22px',
+              height: '22px',
+              borderRadius: '50%',
+              background: '#008BDC',
+              color: '#FFFFFF',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: 700
             }}>
-              <span className="sun-pulse" style={{ width: '8px', height: '8px', background: '#10B981', boxShadow: '0 0 10px #10B981' }} />
-              <span className="mono" style={{ fontSize: '11px', color: 'var(--ink-secondary)', fontWeight: 600 }}>
-                Live Proctor & Code Arena
-              </span>
-            </div>
+              R
+            </span>
+            <span>Rahul Sharma</span>
           </div>
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }

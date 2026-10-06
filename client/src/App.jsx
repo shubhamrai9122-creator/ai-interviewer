@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import StudentPortal from './components/StudentPortal';
+import SyllabusTrainingLab from './components/SyllabusTrainingLab';
 import FacultyDashboard from './components/FacultyDashboard';
-import ScalabilityReport from './components/ScalabilityReport';
-import StarfieldSky from './components/StarfieldSky';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('student'); // 'student', 'faculty', 'scalability'
+  const [activeTab, setActiveTab] = useState('interview'); // 'interview', 'training', 'reports'
+  const [activeSyllabusForInterview, setActiveSyllabusForInterview] = useState(null);
   const [currentUser, setCurrentUser] = useState({
-    id: 'STU001',
+    id: 'IS-2026-DSA',
     name: 'Rahul Sharma',
     role: 'STUDENT'
   });
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Living Ambient Canvas (Light & Cosmic Mixed) */}
-      <StarfieldSky />
+  const handleLaunchInterviewFromSyllabus = (syllabus) => {
+    setActiveSyllabusForInterview(syllabus);
+    setActiveTab('interview');
+  };
 
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#F8F9FA' }}>
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -25,10 +27,21 @@ function App() {
         setCurrentUser={setCurrentUser}
       />
 
-      <main style={{ flex: 1, paddingBottom: '24px', position: 'relative', zIndex: 1 }}>
-        {activeTab === 'student' && <StudentPortal />}
-        {activeTab === 'faculty' && <FacultyDashboard />}
-        {activeTab === 'scalability' && <ScalabilityReport />}
+      <main style={{ flex: 1, paddingBottom: '36px' }}>
+        {activeTab === 'interview' && (
+          <StudentPortal
+            initialSyllabus={activeSyllabusForInterview}
+            onNavigateToTraining={() => setActiveTab('training')}
+          />
+        )}
+        {activeTab === 'training' && (
+          <SyllabusTrainingLab
+            onLaunchInterview={handleLaunchInterviewFromSyllabus}
+          />
+        )}
+        {activeTab === 'reports' && (
+          <FacultyDashboard />
+        )}
       </main>
     </div>
   );

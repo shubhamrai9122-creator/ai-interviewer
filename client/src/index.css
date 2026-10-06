@@ -1,72 +1,83 @@
 /* ==========================================================================
-   AI Viva Platform — White & Mixed Cosmic Theme
-   Inspired by rishiraj38.github.io (White Dominant with Cosmic Contrast)
+   Internshala Mock AI Interviewer — Official Design System & Theme
+   Signature Palette: Internshala Blue (#008BDC), Accent Orange (#FF6B00),
+   Clean White (#FFFFFF), and Crisp Gray (#F8F9FA)
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* Dominant White & Porcelain Palette */
-  --space: #F8FAFC;            /* Clean crisp slate-50 base */
-  --deep: #FFFFFF;             /* Pure white canvas */
-  --panel: rgba(255, 255, 255, 0.88); /* Luminous white glass */
-  --panel-solid: #FFFFFF;
-  --panel-card: #FFFFFF;
-  --panel-hover: #F1F5F9;
+  /* Official Internshala Palette */
+  --is-blue: #008BDC;
+  --is-blue-hover: #0073B6;
+  --is-blue-dark: #005F96;
+  --is-blue-light: #EBF5FB;
+  --is-blue-subtle: #F0F8FD;
 
-  /* Typography Colors (Crisp, High Contrast Slate & Obsidian) */
-  --ink: #0F172A;              /* Deep slate obsidian for maximum clarity */
-  --ink-secondary: #334155;    /* Slate-700 for descriptions */
-  --muted: #64748B;            /* Slate-500 for secondary tags */
-  --text-dim: #94A3B8;         /* Slate-400 for subtle borders & captions */
+  --is-orange: #FF6B00;
+  --is-orange-hover: #E65A00;
+  --is-orange-light: #FFF4EC;
 
-  /* Borders & Rules */
-  --rule: rgba(203, 213, 225, 0.7);       /* Slate-300 rule */
-  --rule-bright: rgba(148, 163, 184, 0.5); /* Slate-400 crisp rule */
-  --rule-glow: rgba(99, 102, 241, 0.35);
+  --is-green: #10B981;
+  --is-green-light: #ECFDF5;
+  --is-red: #EF4444;
+  --is-red-light: #FEF2F2;
+  --is-amber: #F59E0B;
+  --is-amber-light: #FFFBEB;
 
-  /* Shadows for Elevated Porcelain Glass */
-  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-card: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02);
-  --shadow-elevated: 0 20px 40px -10px rgba(15, 23, 42, 0.09), 0 10px 15px -3px rgba(15, 23, 42, 0.04);
-  --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.18);
-
-  /* Mixed Dark Contrast Units (From Rishi Raj) */
-  --dark-pill: #0B0F19;
-  --dark-pill-ink: #F8FAFC;
-
-  /* Celestial Accents */
-  --sun: #F59E0B;              /* Radiant solar gold / amber */
-  --nebula: #6366F1;           /* Electric cosmic indigo */
-  --ice: #0284C7;              /* Vivid celestial cyan / blue */
-  --rose: #E11D48;             /* Hot vibrant rose */
-  --aurora: #059669;           /* Emerald aurora green */
-
-  /* Semantic Mappings */
-  --primary: var(--nebula);
-  --primary-light: #EEF2FF;
-  --primary-glow: rgba(99, 102, 241, 0.25);
-  --cyan: var(--ice);
-  --cyan-glow: rgba(2, 132, 199, 0.2);
-  --emerald: var(--aurora);
-  --emerald-glow: rgba(5, 150, 105, 0.2);
-  --amber: var(--sun);
-  --amber-glow: rgba(245, 158, 11, 0.2);
-  --rose-glow: rgba(225, 29, 72, 0.2);
-  --border-subtle: var(--rule);
+  /* Neutrals & Surfaces */
+  --bg-page: #F8F9FA;
+  --bg-surface: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-muted: #F1F5F9;
 
   /* Typography */
-  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
-  --body: "Figtree", system-ui, -apple-system, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
-  --font-sans: var(--body);
-  --font-mono: var(--mono);
+  --text-main: #1E293B;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-  --gutter: clamp(16px, 4vw, 56px);
+  /* Borders & Dividers */
+  --border-light: #E2E8F0;
+  --border-subtle: #EDF2F7;
+  --border-blue: rgba(0, 139, 220, 0.35);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-blue: 0 4px 14px 0 rgba(0, 139, 220, 0.25);
+
+  /* Aliases for legacy component compatibility */
+  --space: var(--bg-page);
+  --deep: var(--bg-surface);
+  --panel: var(--bg-surface);
+  --panel-solid: var(--bg-surface);
+  --panel-card: var(--bg-surface);
+  --panel-hover: var(--is-blue-light);
+  --ink: var(--text-main);
+  --ink-secondary: var(--text-secondary);
+  --muted: var(--text-muted);
+  --rule: var(--border-light);
+  --primary: var(--is-blue);
+  --primary-light: var(--is-blue-light);
+  --primary-glow: var(--shadow-blue);
+  --cyan: var(--is-blue);
+  --emerald: var(--is-green);
+  --amber: var(--is-amber);
+  --sun: var(--is-orange);
+  --nebula: var(--is-blue);
+  --ice: var(--is-blue);
+
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", Menlo, Monaco, Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --gutter: clamp(16px, 3vw, 40px);
 }
 
 *, *::before, *::after {
@@ -80,9 +91,9 @@ html {
 }
 
 body {
-  background: var(--space);
-  color: var(--ink);
-  font-family: var(--body);
+  background: var(--bg-page);
+  color: var(--text-main);
+  font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -92,451 +103,179 @@ body {
 }
 
 a {
-  color: inherit;
-  text-decoration-color: var(--rule);
-  text-underline-offset: 0.22em;
-  text-decoration-thickness: 1px;
-  transition: color 0.2s, text-decoration-color 0.2s;
+  color: var(--is-blue);
+  text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 a:hover {
-  color: var(--nebula);
-  text-decoration-color: var(--nebula);
+  color: var(--is-blue-hover);
+  text-decoration: underline;
 }
 
-::selection {
-  background: #E0E7FF;
-  color: #312E81;
-}
-
-/* ==========================================================================
-   Universe Starfield & Ambient Nebulae (Light/Mixed Variant)
-   ========================================================================== */
-
-.sky {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.sky canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.neb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.neb-a {
-  width: min(60vw, 650px);
-  height: min(60vw, 650px);
-  top: -15%;
-  right: -5%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.12), transparent 70%);
-  animation: driftA 22s ease-in-out infinite alternate;
-}
-
-.neb-b {
-  width: min(50vw, 550px);
-  height: min(50vw, 550px);
-  top: 35%;
-  left: -10%;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.09), transparent 70%);
-  animation: driftB 28s ease-in-out infinite alternate;
-}
-
-.neb-c {
-  width: min(55vw, 600px);
-  height: min(55vw, 600px);
-  bottom: -15%;
-  right: 15%;
-  background: radial-gradient(circle, rgba(2, 132, 199, 0.09), transparent 70%);
-  animation: driftC 25s ease-in-out infinite alternate;
-}
-
-@keyframes driftA {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-60px, 40px, 0) scale(1.08); }
-}
-
-@keyframes driftB {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(50px, -45px, 0) scale(1.06); }
-}
-
-@keyframes driftC {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-40px, -50px, 0) scale(1.05); }
-}
-
-/* Interactive Cursor Glow (Light Canvas) */
-.cursor-glow {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 480px;
-  height: 480px;
-  margin-left: -240px;
-  margin-top: -240px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.06), transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 0.4s ease;
-  will-change: transform;
-}
-
-/* ==========================================================================
-   Top Cosmic Gradient Progress Beam
-   ========================================================================== */
-
-.top-progress-beam {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--sun) 0%, var(--nebula) 45%, var(--ice) 80%, var(--aurora) 100%);
-  z-index: 100;
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
-}
-
-/* ==========================================================================
-   Typography & Sheen Effects (from rishiraj38.github.io)
-   ========================================================================== */
-
-.sheen-text {
-  background: linear-gradient(135deg, #0F172A 0%, #4338CA 45%, #6366F1 80%, #0F172A 100%);
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: sheenFlow 10s ease infinite;
-}
-
-@keyframes sheenFlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.mono {
-  font-family: var(--mono);
-  font-feature-settings: "tnum" on, "zero" on;
-}
-
-/* ==========================================================================
-   Signature Units & Badges (Rishi Raj Design)
-   ========================================================================== */
-
-/* Eyebrow Tag with Pulsing Radar Ring */
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--nebula);
-  font-weight: 700;
-}
-
-.eyebrow::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--sun);
-  box-shadow: 0 0 10px var(--sun);
-  animation: radarPing 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-@keyframes radarPing {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-  70% { transform: scale(1.3); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-}
-
-/* Sun Pulse Icon */
-.sun-pulse {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--sun);
-  box-shadow: 0 0 12px var(--sun);
-  animation: pulseGlow 2s ease-in-out infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.65; transform: scale(1.15); }
-}
-
-/* Pill Badges (White Canvas with Crisp Borders) */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--mono);
-  letter-spacing: 0.03em;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.badge-dark {
-  background: #0B0F19;
-  color: #F8FAFC;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 2px 8px rgba(11, 15, 25, 0.15);
-}
-
-.badge-purple {
-  background: #EEF2FF;
-  color: #4338CA;
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.badge-amber {
-  background: #FEF3C7;
-  color: #B45309;
-  border-color: rgba(245, 158, 11, 0.35);
-}
-
-.badge-cyan {
-  background: #F0F9FF;
-  color: #0369A1;
-  border-color: rgba(2, 132, 199, 0.3);
-}
-
-.badge-emerald {
-  background: #ECFDF5;
-  color: #047857;
-  border-color: rgba(5, 150, 105, 0.3);
-}
-
-.badge-rose {
-  background: #FFF1F2;
-  color: #BE123C;
-  border-color: rgba(225, 29, 72, 0.3);
-}
-
-/* ==========================================================================
-   Ticker Marquee Belts (from rishiraj38.github.io)
-   ========================================================================== */
-
-.belts {
-  position: relative;
-  overflow: hidden;
-  padding: 10px 0;
-  background: rgba(255, 255, 255, 0.7);
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  backdrop-filter: blur(12px);
-  WebkitBackdropFilter: blur(12px);
-}
-
-.belt-track {
-  display: flex;
-  gap: 36px;
-  width: max-content;
-  animation: beltScroll 32s linear infinite;
-}
-
-.belt-track:hover {
-  animation-play-state: paused;
-}
-
-.belt-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--ink-secondary);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-@keyframes beltScroll {
-  0% { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(-50%, 0, 0); }
-}
-
-/* ==========================================================================
-   Porcelain Glass Panels & Cards
-   ========================================================================== */
-
-.glass-panel {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-card);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.glass-panel:hover {
-  border-color: var(--rule-bright);
-  box-shadow: var(--shadow-elevated);
-}
-
-.glass-card-elevated {
-  background: #FFFFFF;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-card-elevated:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-elevated);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-/* ==========================================================================
-   Interactive Buttons & Controls
-   ========================================================================== */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: var(--body);
-  font-weight: 600;
-  font-size: 13px;
-  padding: 10px 20px;
-  border-radius: 999px;
-  border: 1px solid transparent;
+button {
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-/* Primary Button: High-Contrast Obsidian Dark with Radiant Glow */
-.btn-primary {
-  background: #0F172A;
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
-}
-
-.btn-primary:hover {
-  background: #1E293B;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.28);
-}
-
-/* Secondary Button: Crisp Pure White with Slate Border */
-.btn-secondary {
-  background: #FFFFFF;
-  color: var(--ink);
-  border: 1px solid var(--rule);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-secondary:hover {
-  background: #F8FAFC;
-  border-color: var(--rule-bright);
-  transform: translateY(-1px);
-}
-
-.btn-accent {
-  background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
-  color: #FFFFFF;
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
-}
-
-.btn-accent:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
-}
-
-/* Disabled State */
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-/* ==========================================================================
-   Form Controls (Clean, Accessible)
-   ========================================================================== */
-
-.input-field {
-  width: 100%;
-  background: #FFFFFF;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  font-family: var(--body);
-  font-size: 14px;
-  color: var(--ink);
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.input-field:focus {
+  border: none;
   outline: none;
-  border-color: var(--nebula);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  transition: all 0.2s ease;
 }
 
-.input-field:disabled {
-  background: #F1F5F9;
-  color: var(--text-dim);
-  cursor: not-allowed;
+input, textarea, select {
+  font-family: inherit;
 }
 
 /* ==========================================================================
-   Radar Voice Waves & Speaking State
+   Internshala Core UI Components
    ========================================================================== */
 
-.voice-wave-container {
-  display: flex;
+/* Buttons */
+.is-btn-primary {
+  background-color: var(--is-blue);
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 28px;
+  gap: 8px;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 139, 220, 0.2);
+  transition: all 0.2s ease;
 }
 
-.voice-wave-bar {
-  width: 3.5px;
+.is-btn-primary:hover:not(:disabled) {
+  background-color: var(--is-blue-hover);
+  box-shadow: 0 4px 10px rgba(0, 139, 220, 0.3);
+  transform: translateY(-1px);
+}
+
+.is-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.is-btn-secondary {
+  background-color: #FFFFFF;
+  color: var(--is-blue);
+  border: 1.5px solid var(--is-blue);
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.is-btn-secondary:hover:not(:disabled) {
+  background-color: var(--is-blue-light);
+}
+
+.is-btn-orange {
+  background-color: var(--is-orange);
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(255, 107, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.is-btn-orange:hover:not(:disabled) {
+  background-color: var(--is-orange-hover);
+  transform: translateY(-1px);
+}
+
+/* Internshala Cards */
+.is-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.is-card:hover {
+  box-shadow: var(--shadow-card);
+  border-color: #CBD5E1;
+}
+
+.is-card-highlight {
+  border-top: 4px solid var(--is-blue);
+}
+
+.is-card-orange {
+  border-top: 4px solid var(--is-orange);
+}
+
+/* Badges & Pills */
+.is-badge-blue {
+  background: var(--is-blue-light);
+  color: var(--is-blue-hover);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--nebula), var(--ice));
-  animation: waveBar 1.2s ease-in-out infinite alternate;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-@keyframes waveBar {
-  0% { height: 4px; }
-  100% { height: 26px; }
+.is-badge-orange {
+  background: var(--is-orange-light);
+  color: var(--is-orange);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* ==========================================================================
-   Custom Scrollbar
-   ========================================================================== */
+.is-badge-green {
+  background: var(--is-green-light);
+  color: #065F46;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
+/* Audio Waveform animation */
+@keyframes is-pulse-wave {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1.0); }
+}
+
+.is-wave-bar {
+  display: inline-block;
+  width: 4px;
+  height: 24px;
+  background-color: var(--is-blue);
+  border-radius: 2px;
+  margin: 0 2px;
+  animation: is-pulse-wave 1s ease-in-out infinite;
+}
+
+.is-wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.is-wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.is-wave-bar:nth-child(4) { animation-delay: 0.45s; }
+.is-wave-bar:nth-child(5) { animation-delay: 0.6s; }
+
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

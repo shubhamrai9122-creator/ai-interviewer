@@ -18,8 +18,10 @@ from server.models import (
     ContextQuestionGenRequest, VoiceAcousticsRequest,
     VivaDurationUpdateRequest, QuestionTreeNodeCreate,
     ProjectIngestRequest, ProjectVerdictRequest,
-    SyllabusTreeUploadRequest, CodeExecutionRequest
+    SyllabusTreeUploadRequest, CodeExecutionRequest,
+    TrainedSyllabus, SyllabusTrainRequest, SyllabusToggleRequest
 )
+from server.syllabus_service import SyllabusService
 from server.viva_engine import VivaEngine
 from server.scoring_worker import ScoringWorker
 from server.seed_data import seed_database
@@ -594,6 +596,58 @@ def add_question_tree_node(req: QuestionTreeNodeCreate, db: Session = Depends(ge
         }
     }
 
+# --- Candidate Syllabus Personal Training Endpoints ---
+@app.post("/api/syllabus/train")
+def train_custom_syllabus(req: SyllabusTrainRequest, db: Session = Depends(get_db)):
+    service = SyllabusService(db)
+    result = service.train_syllabus(
+        title=req.title,
+        subject=req.subject,
+        syllabus_text=req.syllabus_text,
+        target_role=req.target_role or "Software Development Engineer (SDE) Intern"
+    )
+    return result
+
+@app.get("/api/syllabus/list")
+def list_trained_syllabi(db: Session = Depends(get_db)):
+    service = SyllabusService(db)
+    return service.list_syllabi()
+
+@app.post("/api/syllabus/toggle")
+def toggle_trained_syllabus(req: SyllabusToggleRequest, db: Session = Depends(get_db)):
+    service = SyllabusService(db)
+    ok = service.toggle_syllabus(req.syllabus_id, req.is_active)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Syllabus not found")
+    return {"status": "success", "syllabus_id": req.syllabus_id, "is_active": req.is_active}
+
+@app.delete("/api/syllabus/{syllabus_id}")
+def delete_trained_syllabus(syllabus_id: int, db: Session = Depends(get_db)):
+    record = db.query(TrainedSyllabus).filter(TrainedSyllabus.id == syllabus_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Syllabus not found")
+    db.delete(record)
+    db.commit()
+    return {"status": "deleted", "id": syllabus_id}
+
+@app.get("/api/syllabus/active")
+def get_active_syllabi(subject: Optional[str] = None, db: Session = Depends(get_db)):
+    service = SyllabusService(db)
+    active = service.get_active_syllabus(subject)
+    if not active:
+        return {"has_active": False, "syllabus": None}
+    return {
+        "has_active": True,
+        "syllabus": {
+            "id": active.id,
+            "title": active.title,
+            "subject": active.subject,
+            "topics": active.topics_extracted,
+            "concepts": active.key_concepts,
+            "questions_count": len(active.generated_questions or [])
+        }
+    }
+
 # --- Live Viva Session Execution ---
 @app.post("/api/session/start")
 def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
@@ -601,10 +655,17 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
     if not viva:
         raise HTTPException(status_code=404, detail="Viva not found")
 
-    # Default to sweet female voice "aria"
-    persona_key = req.examiner_persona or "aria"
+    # Default to Internshala AI Recruiter "ira"
+    persona_key = req.examiner_persona or "ira"
     subject_label = req.subject_domain or viva.subject
     duration_mins = req.duration_minutes if req.duration_minutes is not None else viva.duration_minutes
+
+    active_s = None
+    if req.active_syllabus_id:
+        active_s = db.query(TrainedSyllabus).filter(TrainedSyllabus.id == req.active_syllabus_id).first()
+    if not active_s:
+        target_sub = "Web Development" if "web" in subject_label.lower() else "Data Structures & Algorithms"
+        active_s = db.query(TrainedSyllabus).filter(TrainedSyllabus.is_active == True, TrainedSyllabus.subject == target_sub).order_by(TrainedSyllabus.created_at.desc()).first()
 
     session = VivaSession(
         viva_id=viva.id,
@@ -616,29 +677,45 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         elapsed_seconds=0.0,
         duration_minutes=duration_mins,
         examiner_persona=persona_key,
-        subject_domain=subject_label
+        subject_domain=subject_label,
+        active_syllabus_id=active_s.id if active_s else None
     )
     db.add(session)
     db.commit()
     db.refresh(session)
 
-    # Natural Interviewer greeting strictly aligned with Section 19
-    persona_names = {
-        "aria": "Aria",
-        "grok_sweet": "Grok AI",
-        "maya": "Maya",
-        "zara": "Zara",
-        "alex": "Alex Sterling",
-        "priya": "Prof. Priya Nair",
-        "eleanor": "Dr. Eleanor Vance"
-    }
-    p_name = persona_names.get(persona_key, "Aria")
-    opener_text = (
-        f"Hello {session.student_name}! I am {p_name}, your AI Technical Interviewer today. "
-        "Welcome to your technical interview. To help tailor our session, could you briefly introduce yourself, "
-        "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
-        "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
-    )
+    if persona_key == "ira":
+        if active_s:
+            opener_text = (
+                f"Hello {session.student_name}! I am Ira, your AI Recruiter from Mirai School of Technology. "
+                f"Welcome to your MSOT Mock Technical Interview! I have calibrated our interview questions based on your syllabus: '{active_s.title}'. "
+                "To help tailor our session today, could you briefly introduce yourself, let me know whether you are ready to begin, "
+                "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
+            )
+        else:
+            opener_text = (
+                f"Hello {session.student_name}! I am Ira, your AI Recruiter from Mirai School of Technology. "
+                "Welcome to your MSOT Mock Technical Interview! To help tailor our session today, could you briefly introduce yourself, "
+                "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
+                "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
+            )
+    else:
+        persona_names = {
+            "aria": "Aria",
+            "grok_sweet": "Grok AI",
+            "maya": "Maya",
+            "zara": "Zara",
+            "alex": "Alex Sterling",
+            "priya": "Prof. Priya Nair",
+            "eleanor": "Dr. Eleanor Vance"
+        }
+        p_name = persona_names.get(persona_key, "Ira")
+        opener_text = (
+            f"Hello {session.student_name}! I am {p_name}, your AI Technical Interviewer today. "
+            "Welcome to your technical interview. To help tailor our session, could you briefly introduce yourself, "
+            "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
+            "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
+        )
 
     first_qa = QuestionAsked(
         session_id=session.id,
@@ -662,7 +739,12 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         "phase": SessionPhase.WARMUP.value,
         "elapsed_seconds": 0.0,
         "examiner_persona": persona_key,
-        "subject_domain": subject_label
+        "subject_domain": subject_label,
+        "active_syllabus_id": active_s.id if active_s else None,
+        "active_syllabus_title": active_s.title if active_s else None,
+        "is_coding_question": False,
+        "should_ask_to_read": False,
+        "coding_problem_details": None
     }
 
 @app.post("/api/session/turn")
@@ -685,6 +767,7 @@ def process_turn(req: StudentTurnRequest, db: Session = Depends(get_db)):
     return result
 
 @app.post("/api/session/end")
+@app.post("/api/session/{session_id}/end")
 def end_viva_session(session_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     session = db.query(VivaSession).filter(VivaSession.id == session_id).first()
     if not session:
@@ -746,17 +829,22 @@ def log_integrity_event(req: IntegrityEventRequest, db: Session = Depends(get_db
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    ts = req.timestamp_sec if req.timestamp_sec is not None else (req.elapsed_seconds if req.elapsed_seconds is not None else 0.0)
+    det = req.details or (str(req.metadata_json) if req.metadata_json else "Proctor Alert")
+
     log_entry = IntegrityLog(
         session_id=req.session_id,
         event_type=req.event_type,
-        details=req.details,
-        timestamp_sec=req.timestamp_sec
+        details=det,
+        timestamp_sec=ts
     )
     db.add(log_entry)
 
     if req.event_type in ["PROMPT_INJECTION_ATTEMPT", "MULTIPLE_VOICES_DETECTED"]:
         session.flagged_for_review = True
-        session.flag_reason = f"Integrity Flag: {req.event_type} - {req.details}"
+        session.flag_reason = f"Integrity Flag: {req.event_type} - {det}"
+    elif req.event_type == "TAB_SWITCH":
+        session.flag_reason = f"Proctor Alert: Tab switch detected ({det})"
 
     db.commit()
     return {"status": "logged", "flagged": session.flagged_for_review}

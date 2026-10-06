@@ -188,7 +188,8 @@ export default function HackerRankCodeEditor({
   onChange = () => {},
   onSubmitSolution = () => {}
 }) {
-  const [language, setLanguage] = useState('javascript');
+  const standardLang = subject === 'webdev' ? 'javascript' : 'cpp';
+  const [language, setLanguage] = useState(standardLang);
   const [activeBottomTab, setActiveBottomTab] = useState('testcase'); // 'testcase' or 'result'
   const [selectedTestCaseIndex, setSelectedTestCaseIndex] = useState(0);
   const [customInput, setCustomInput] = useState('');
@@ -202,13 +203,15 @@ export default function HackerRankCodeEditor({
 
   const testCases = subject === 'webdev' ? DEFAULT_WEB_TEST_CASES : DEFAULT_DSA_TEST_CASES;
 
-  // Initialize with starter code if empty or on subject change
+  // Initialize with standard starter code on subject change or if empty
   useEffect(() => {
+    const stdLang = subject === 'webdev' ? 'javascript' : 'cpp';
+    setLanguage(stdLang);
+    const template = STARTER_CODES[stdLang]?.[subject] || (subject === 'webdev' ? STARTER_CODES.javascript.webdev : STARTER_CODES.cpp.dsa);
     if (!code || code.trim() === '') {
-      const template = STARTER_CODES[language]?.[subject] || STARTER_CODES.javascript.dsa;
       onChange(template);
     }
-  }, [language, subject, code]);
+  }, [subject]);
 
   const handleLanguageChange = (newLang) => {
     setLanguage(newLang);
@@ -324,7 +327,7 @@ export default function HackerRankCodeEditor({
           }}>
             <Code2 size={14} color="#FFA116" />
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#E5E5E5' }}>
-              LeetCode Arena
+              MSOT LeetCode Arena
             </span>
           </div>
 
@@ -344,9 +347,9 @@ export default function HackerRankCodeEditor({
               cursor: 'pointer'
             }}
           >
-            <option value="javascript">JavaScript</option>
+            <option value="cpp">{subject === 'dsa' ? 'C++ (Standard)' : 'C++'}</option>
+            <option value="javascript">{subject === 'webdev' ? 'JavaScript (Standard)' : 'JavaScript'}</option>
             <option value="python">Python 3</option>
-            <option value="cpp">C++</option>
             <option value="java">Java</option>
           </select>
 
@@ -359,7 +362,7 @@ export default function HackerRankCodeEditor({
             color: '#FFA116',
             fontWeight: 700
           }}>
-            {subject.toUpperCase()}
+            {subject === 'dsa' ? 'DSA • C++ Standard' : 'WEB • JS Standard'}
           </span>
         </div>
 

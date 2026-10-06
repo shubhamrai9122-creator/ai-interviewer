@@ -22,8 +22,19 @@ HESITATION_PHRASES = [
     "might be wrong", "could be", "i don't recall exactly"
 ]
 
-# Examiner Personas (Strictly Sweet, Young Female Voices - No Male Voices)
+# Examiner Personas (Featuring Ira - MSOT AI Recruiter, Mirai School of Technology)
 EXAMINER_PERSONAS = {
+    "ira": {
+        "id": "ira",
+        "name": "Ira",
+        "title": "MSOT AI Recruiter",
+        "style": "Professional, encouraging, articulate technical interviewer tone",
+        "voice_gender": "female",
+        "pitch": 1.15,
+        "rate": 0.98,
+        "avatar_badge": "💼 Ira • MSOT AI Recruiter",
+        "preview_phrase": "Hi there! I'm Ira, your AI Recruiter from Mirai School of Technology. Today we'll evaluate your DSA and Web Development problem-solving skills."
+    },
     "grok_sweet": {
         "id": "grok_sweet",
         "name": "Grok Sweet AI",

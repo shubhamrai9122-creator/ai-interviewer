@@ -133,11 +133,12 @@ class VivaSession(Base):
     flagged_for_review = Column(Boolean, default=False)
     flag_reason = Column(Text, nullable=True)
     scoring_prompt_version = Column(String(50), default="v1.0.0")
-    examiner_persona = Column(String(50), default="aria")
+    examiner_persona = Column(String(50), default="ira")
     subject_domain = Column(String(100), default="Data Structures & Algorithms")
     interview_profile = Column(JSON, default=dict)
     interview_level = Column(String(50), default="Intermediate")
     preferred_domain = Column(String(50), default="dsa")
+    active_syllabus_id = Column(Integer, nullable=True)
 
     viva = relationship("Viva", back_populates="sessions")
     questions_asked = relationship("QuestionAsked", back_populates="session", cascade="all, delete-orphan")
@@ -145,6 +146,19 @@ class VivaSession(Base):
     score = relationship("VivaScore", back_populates="session", uselist=False, cascade="all, delete-orphan")
     overrides = relationship("FacultyOverride", back_populates="session", cascade="all, delete-orphan")
     integrity_logs = relationship("IntegrityLog", back_populates="session", cascade="all, delete-orphan")
+
+class TrainedSyllabus(Base):
+    __tablename__ = "trained_syllabi"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(150), nullable=False)
+    subject = Column(String(100), nullable=False) # "Data Structures & Algorithms" or "Web Development"
+    target_role = Column(String(100), default="Software Development Engineer (SDE) Intern")
+    syllabus_text = Column(Text, nullable=False)
+    topics_extracted = Column(JSON, default=list)
+    key_concepts = Column(JSON, default=list)
+    generated_questions = Column(JSON, default=list)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(Float, default=time.time)
 
 class QuestionAsked(Base):
     __tablename__ = "questions_asked"
@@ -263,9 +277,20 @@ class StudentStartRequest(BaseModel):
     student_name: str
     viva_id: int = 1
     consent_given: bool = True
-    examiner_persona: str = "aria"
+    examiner_persona: str = "ira"
     subject_domain: str = "Data Structures & Algorithms"
     duration_minutes: Optional[int] = 15
+    active_syllabus_id: Optional[int] = None
+
+class SyllabusTrainRequest(BaseModel):
+    title: str = "Candidate Technical Syllabus"
+    subject: str = "Data Structures & Algorithms" # or "Web Development"
+    target_role: Optional[str] = "Software Development Engineer (SDE) Intern"
+    syllabus_text: str
+
+class SyllabusToggleRequest(BaseModel):
+    syllabus_id: int
+    is_active: bool
 
 class VivaDurationUpdateRequest(BaseModel):
     duration_minutes: int # 0 for unlimited, or e.g. 5, 10, 15, 30
@@ -316,8 +341,11 @@ class OverrideRequest(BaseModel):
 class IntegrityEventRequest(BaseModel):
     session_id: int
     event_type: str
-    details: str
-    timestamp_sec: float
+    details: Optional[str] = "Proctor Alert"
+    timestamp_sec: Optional[float] = None
+    elapsed_seconds: Optional[float] = None
+    confidence_score: Optional[float] = 1.0
+    metadata_json: Optional[Dict[str, Any]] = None
 
 class ProjectIngestRequest(BaseModel):
     repo_url: Optional[str] = None
