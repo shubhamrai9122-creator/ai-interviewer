@@ -9,7 +9,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
       <header style={{
         borderBottom: '1px solid var(--rule)',
-        background: 'rgba(255, 255, 255, 0.92)',
+        background: 'rgba(255, 255, 255, 0.94)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         position: 'sticky',
@@ -21,7 +21,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
         <div style={{
           maxWidth: '1440px',
           margin: '0 auto',
-          height: '76px',
+          height: '74px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -30,8 +30,8 @@ export default function Navbar({ activeTab, setActiveTab }) {
           {/* Brand: Sun Pulse & Unbounded Sheen */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              width: '44px',
-              height: '44px',
+              width: '42px',
+              height: '42px',
               borderRadius: '50%',
               background: 'radial-gradient(circle at 35% 35%, #FFE9B8, var(--sun) 55%, #D97706)',
               boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
@@ -39,16 +39,16 @@ export default function Navbar({ activeTab, setActiveTab }) {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Radio size={20} color="#FFFFFF" />
+              <Radio size={19} color="#FFFFFF" />
             </div>
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
-                  ADAPTIVE TECHNICAL VIVA
+                  TECHNICAL VIVA ARENA
                 </span>
                 <span className="badge badge-dark" style={{ fontSize: '9px', padding: '2px 8px' }}>
-                  DSA & WEB DEV ONLY
+                  DSA & WEB DEV
                 </span>
               </div>
               <h1 style={{
@@ -59,12 +59,12 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 lineHeight: '1.2',
                 marginTop: '2px'
               }} className="sheen-text">
-                AI INTERVIEWER <span style={{ color: 'var(--ice)' }}>• VIVA CORE</span>
+                AI INTERVIEWER <span style={{ color: 'var(--ice)' }}>• CORE</span>
               </h1>
             </div>
           </div>
 
-          {/* Navigation Tabs (High Contrast White & Dark Mixed Aesthetic) */}
+          {/* Navigation Tabs */}
           <nav style={{
             display: 'flex',
             gap: '6px',
@@ -79,7 +79,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               style={{
                 fontSize: '12px',
                 padding: '7px 18px',
-                border: activeTab === 'student' ? 'none' : 'none',
+                border: 'none',
                 background: activeTab === 'student' ? '#0F172A' : 'transparent',
                 color: activeTab === 'student' ? '#FFFFFF' : 'var(--ink-secondary)',
                 boxShadow: activeTab === 'student' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
@@ -95,7 +95,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               style={{
                 fontSize: '12px',
                 padding: '7px 18px',
-                border: activeTab === 'faculty' ? 'none' : 'none',
+                border: 'none',
                 background: activeTab === 'faculty' ? '#0F172A' : 'transparent',
                 color: activeTab === 'faculty' ? '#FFFFFF' : 'var(--ink-secondary)',
                 boxShadow: activeTab === 'faculty' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
@@ -111,7 +111,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               style={{
                 fontSize: '12px',
                 padding: '7px 18px',
-                border: activeTab === 'scalability' ? 'none' : 'none',
+                border: 'none',
                 background: activeTab === 'scalability' ? '#0F172A' : 'transparent',
                 color: activeTab === 'scalability' ? '#FFFFFF' : 'var(--ink-secondary)',
                 boxShadow: activeTab === 'scalability' ? '0 2px 8px rgba(15, 23, 42, 0.2)' : 'none'
@@ -122,8 +122,8 @@ export default function Navbar({ activeTab, setActiveTab }) {
             </button>
           </nav>
 
-          {/* Right Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Right Status Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -134,70 +134,50 @@ export default function Navbar({ activeTab, setActiveTab }) {
               border: '1px solid var(--rule)',
               boxShadow: 'var(--shadow-sm)'
             }}>
-              <span className="sun-pulse" style={{ width: '8px', height: '8px' }} />
+              <span className="sun-pulse" style={{ width: '8px', height: '8px', background: '#10B981', boxShadow: '0 0 10px #10B981' }} />
               <span className="mono" style={{ fontSize: '11px', color: 'var(--ink-secondary)', fontWeight: 600 }}>
-                🌸 Grok / Aria Sweet Voice Active
+                Live Proctor & Code Arena
               </span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Marquee Ticker Belt (from rishiraj38.github.io) */}
+      {/* Clean Ticker Belt: strictly DSA & Web Development only */}
       <div className="belts">
         <div className="belt-track">
           <div className="belt-item">
             <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Arrays & Hash Maps</span>
+            <span>DSA: Data Structures & Algorithms</span>
           </div>
           <div className="belt-item">
             <span className="badge badge-purple" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>React 19 Virtual DOM & Fiber</span>
+            <span>Web Development & Systems Architecture</span>
           </div>
           <div className="belt-item">
             <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: BST & AVL Tree Rotations</span>
+            <span>DSA: Adaptive Complexity Probing</span>
           </div>
           <div className="belt-item">
-            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Async</span>
-            <span>Node.js Event Loop & Microtasks</span>
-          </div>
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Dynamic Programming & 0/1 Knapsack</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-amber" style={{ fontSize: '9px', padding: '1px 6px' }}>Database</span>
-            <span>Clustered vs Non-Clustered B-Tree Indexes</span>
-          </div>
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Kahn's Algorithm & Graph Cycles</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-rose" style={{ fontSize: '9px', padding: '1px 6px' }}>Security</span>
-            <span>WebSockets vs HTTP/2 & CSRF/XSS</span>
+            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
+            <span>Full-Stack Engineering Assessment</span>
           </div>
           {/* Duplicate set for seamless loop */}
           <div className="belt-item">
             <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Arrays & Hash Maps</span>
+            <span>DSA: Data Structures & Algorithms</span>
           </div>
           <div className="belt-item">
             <span className="badge badge-purple" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>React 19 Virtual DOM & Fiber</span>
+            <span>Web Development & Systems Architecture</span>
           </div>
           <div className="belt-item">
             <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: BST & AVL Tree Rotations</span>
+            <span>DSA: Adaptive Complexity Probing</span>
           </div>
           <div className="belt-item">
-            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Async</span>
-            <span>Node.js Event Loop & Microtasks</span>
-          </div>
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Dynamic Programming & 0/1 Knapsack</span>
+            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
+            <span>Full-Stack Engineering Assessment</span>
           </div>
         </div>
       </div>

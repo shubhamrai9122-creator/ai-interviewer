@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, CheckCircle, AlertTriangle, Play, Pause, RotateCcw, 
   Award, ShieldAlert, FileText, Check, X, Download, Sliders, Sparkles, MessageSquare,
-  Volume2, Code2, GitBranch, Clock, PlusCircle, CornerDownRight, Upload, Layers
+  Volume2, Code2, GitBranch, Clock, PlusCircle, CornerDownRight, Upload, Layers, Settings
 } from 'lucide-react';
+import VoiceSettingsModal from './VoiceSettingsModal';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -34,9 +35,10 @@ export default function FacultyDashboard() {
 
   // Exam Duration state (Admin/Faculty configured)
   const [selectedDuration, setSelectedDuration] = useState(15);
-  const [durationSaving, setDurationSaving] = useState(false);
-  const [durationMessage, setDurationMessage] = useState('');
-
+  // Admin Voice Settings modal state
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [selectedPersona, setSelectedPersona] = useState('grok_sweet');
+  const [speechRate, setSpeechRate] = useState(0.98);
   // Audio player ref
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -250,6 +252,15 @@ export default function FacultyDashboard() {
                 Web Dev (CS304)
               </button>
             </div>
+
+            <button
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '12px', padding: '8px 16px' }}
+            >
+              <Volume2 size={14} color="var(--nebula)" />
+              Voice Engine (Admin Only)
+            </button>
 
             <button
               onClick={handleExportCsv}
@@ -762,6 +773,16 @@ export default function FacultyDashboard() {
           )}
         </div>
       )}
+
+      {/* Admin Only Voice Settings Modal */}
+      <VoiceSettingsModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        selectedPersona={selectedPersona}
+        onSelectPersona={setSelectedPersona}
+        speechRate={speechRate}
+        onChangeSpeechRate={setSpeechRate}
+      />
     </div>
   );
 }

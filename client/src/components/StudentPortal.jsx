@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, MicOff, Volume2, Shield, Clock, AlertTriangle, 
   Send, HelpCircle, FastForward, CheckCircle2, Award, FileText,
-  Settings, Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight
+  Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight, Play
 } from 'lucide-react';
 
 import AudioVisualizer from './AudioVisualizer';
-import CodeWhiteboard from './CodeWhiteboard';
-import WebcamProctor from './WebcamProctor';
-import VoiceSettingsModal from './VoiceSettingsModal';
+import HackerRankCodeEditor from './HackerRankCodeEditor';
+import ScreenAndCameraRecorder from './ScreenAndCameraRecorder';
+import SolarSystem3D from './SolarSystem3D';
 import ScorecardModal from './ScorecardModal';
 import { AudioCaptureEngine, analyzeSpokenText } from '../utils/audioCapture';
 
@@ -17,7 +17,7 @@ const API_BASE = 'http://localhost:8000';
 export default function StudentPortal() {
   // Domain selection (Strictly DSA or Web Development)
   const [selectedDomain, setSelectedDomain] = useState('dsa'); // 'dsa' or 'webdev'
-  const [studentId, setStudentId] = useState('STU001');
+  const [rollNumber, setRollNumber] = useState('21BCSE104');
   const [studentName, setStudentName] = useState('Rahul Sharma');
   const [consentGiven, setConsentGiven] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
@@ -36,19 +36,15 @@ export default function StudentPortal() {
   const [lastLatencyMs, setLastLatencyMs] = useState(null);
   const [vivaCompleted, setVivaCompleted] = useState(false);
   const [completionResult, setCompletionResult] = useState(null);
+  const [isScorecardOpen, setIsScorecardOpen] = useState(false);
 
-  // Multi-Modal features: Code Whiteboard & Video Proctor
-  const [showCodePad, setShowCodePad] = useState(false);
+  // Current Interview Step:
+  // 1 = Introduction, 2 = Strong Topic Choice, 3 = Questions on Strong Topic, 4 = Other Topics
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Code editor state
   const [codeContent, setCodeContent] = useState('');
   const [silenceNotice, setSilenceNotice] = useState(null);
-
-  // Voice Settings & Personas (Strictly Sweet Female Voices)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isScorecardOpen, setIsScorecardOpen] = useState(false);
-  const [selectedPersona, setSelectedPersona] = useState('grok_sweet');
-  const [durationMinutes, setDurationMinutes] = useState(15);
-  const [sttEngine, setSttEngine] = useState('hybrid');
-  const [speechRate, setSpeechRate] = useState(0.98);
 
   // Audio Telemetry
   const [audioVolume, setAudioVolume] = useState(0);
@@ -66,6 +62,9 @@ export default function StudentPortal() {
   // Integrity & Anti-Cheating Signals
   const [tabSwitchAlert, setTabSwitchAlert] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+
+  // Fixed 15-Minute Limit
+  const durationMinutes = 15;
 
   // References
   const audioEngineRef = useRef(null);
@@ -93,7 +92,7 @@ export default function StudentPortal() {
     return voices.find(v => v.lang.startsWith('en')) || voices[0];
   };
 
-  // Pre-load voices & viva details
+  // Pre-load speech voices
   useEffect(() => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.getVoices();
@@ -101,18 +100,9 @@ export default function StudentPortal() {
         window.speechSynthesis.getVoices();
       };
     }
-    const targetVivaId = selectedDomain === 'webdev' ? 43 : 42;
-    fetch(`${API_BASE}/api/vivas/${targetVivaId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.duration_minutes !== undefined) {
-          setDurationMinutes(data.duration_minutes || 15);
-        }
-      })
-      .catch(err => console.error('Failed to load viva details:', err));
-  }, [selectedDomain]);
+  }, []);
 
-  // Text-To-Speech with Sweet Young Female Voice
+  // Text-To-Speech with Sweet Young Voice
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -120,20 +110,8 @@ export default function StudentPortal() {
       const v = getSweetFemaleVoice();
       if (v) utterance.voice = v;
 
-      // Sweet young tone calibrations (Pitch: 1.18 - 1.22)
-      if (selectedPersona === 'grok_sweet') {
-        utterance.rate = speechRate * 0.98;
-        utterance.pitch = 1.22;
-      } else if (selectedPersona === 'aria') {
-        utterance.rate = speechRate * 0.95;
-        utterance.pitch = 1.18;
-      } else if (selectedPersona === 'maya') {
-        utterance.rate = speechRate * 0.97;
-        utterance.pitch = 1.15;
-      } else {
-        utterance.rate = speechRate * 0.94;
-        utterance.pitch = 1.16;
-      }
+      utterance.rate = 0.98;
+      utterance.pitch = 1.22; // Sweet melodious young tone
 
       utterance.onstart = () => setIsAiSpeaking(true);
       utterance.onend = () => setIsAiSpeaking(false);
@@ -149,8 +127,8 @@ export default function StudentPortal() {
       timer = setInterval(() => {
         setElapsedSeconds(prev => {
           const next = prev + 1;
-          const totalDurationSec = (durationMinutes || 15) * 60;
-          if (durationMinutes > 0 && next >= totalDurationSec) {
+          const totalDurationSec = durationMinutes * 60;
+          if (next >= totalDurationSec) {
             handleEndViva(next);
             return totalDurationSec;
           }
@@ -159,7 +137,7 @@ export default function StudentPortal() {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isStarted, vivaCompleted, durationMinutes]);
+  }, [isStarted, vivaCompleted]);
 
   // Tab switch detection (Integrity Signal)
   useEffect(() => {
@@ -173,7 +151,7 @@ export default function StudentPortal() {
           body: JSON.stringify({
             session_id: sessionId,
             event_type: 'TAB_SWITCH',
-            details: `Candidate tab unfocused at ${elapsedSeconds}s.`,
+            details: `Candidate window lost focus at ${elapsedSeconds}s.`,
             timestamp_sec: elapsedSeconds
           })
         }).catch(err => console.warn('Integrity log failed:', err));
@@ -184,7 +162,7 @@ export default function StudentPortal() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isStarted, vivaCompleted, sessionId, elapsedSeconds]);
 
-  // Setup live audio capture
+  // Audio Capture Engine
   const setupAudioCapture = async () => {
     try {
       const engine = new AudioCaptureEngine({
@@ -215,7 +193,7 @@ export default function StudentPortal() {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'en-IN'; // Indian-accent English & Hinglish support
+        recognition.lang = 'en-IN'; // Indian English & Hinglish support
 
         recognition.onresult = (event) => {
           let full = '';
@@ -246,30 +224,28 @@ export default function StudentPortal() {
     }
   };
 
-  // Start Viva Session
+  // Start Viva Session (AI INTERVIEW START)
   const handleStartViva = async () => {
     if (!consentGiven) {
-      alert('Please check the consent box to unlock and begin the exam.');
+      alert('Please check the consent box to proceed.');
       return;
     }
 
     const vivaId = selectedDomain === 'webdev' ? 43 : 42;
-    const domainTitle = selectedDomain === 'webdev'
-      ? 'CS304: Modern Web Development & Full-Stack Systems'
-      : 'CS302: Data Structures & Algorithms';
+    const domainTitle = selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms';
 
     try {
       const res = await fetch(`${API_BASE}/api/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          student_id: studentId.trim(),
+          student_id: rollNumber.trim().toUpperCase(),
           student_name: studentName.trim(),
           viva_id: vivaId,
           consent_given: true,
-          examiner_persona: selectedPersona,
+          examiner_persona: 'grok_sweet',
           subject_domain: domainTitle,
-          duration_minutes: durationMinutes || 15
+          duration_minutes: 15
         })
       });
       const data = await res.json();
@@ -278,10 +254,11 @@ export default function StudentPortal() {
       setCurrentPhase(data.phase);
       setQuestionType(data.question_type);
       setIsStarted(true);
+      setCurrentStep(1); // Step 1: Introduction
 
       setTranscriptFeed([
         {
-          speaker: 'Grok / Aria AI Examiner',
+          speaker: 'AI Examiner',
           text: data.first_question,
           time: '00:00',
           type: data.question_type
@@ -296,11 +273,12 @@ export default function StudentPortal() {
   };
 
   // Submit Answer Turn
-  const handleTurnSubmit = async (isGiveup = false, isHintReq = false) => {
+  const handleTurnSubmit = async (isGiveup = false, isHintReq = false, explicitCode = null) => {
     if (isSubmitting || !sessionId) return;
+    const effectiveCode = explicitCode !== null ? explicitCode : codeContent;
     const answerText = studentInput.trim();
-    if (!answerText && !isGiveup && !isHintReq && !codeContent.trim()) {
-      alert('Please speak or type your technical response before submitting.');
+    if (!answerText && !isGiveup && !isHintReq && !effectiveCode.trim()) {
+      alert('Please speak or type your response before submitting.');
       return;
     }
 
@@ -314,7 +292,7 @@ export default function StudentPortal() {
     }
     const answerSec = elapsedSeconds;
 
-    // Upload audio turn
+    // Optional: upload turn audio
     let recordedAudioUrl = null;
     if (audioBlob && audioBlob.size > 0) {
       try {
@@ -340,16 +318,14 @@ export default function StudentPortal() {
       ...prev,
       {
         speaker: studentName,
-        text: answerText || (codeContent ? '[Submitted Code Solution]' : '[Skipped]'),
+        text: answerText || (effectiveCode ? '[Submitted Code Solution in Editor]' : '[Skipped]'),
         time: formatTime(answerSec),
-        codeSnippet: codeContent || null,
+        codeSnippet: effectiveCode || null,
         audioUrl: recordedAudioUrl
       }
     ]);
 
     setStudentInput('');
-    const submittedCode = codeContent;
-    setCodeContent('');
 
     try {
       const res = await fetch(`${API_BASE}/api/session/turn`, {
@@ -362,7 +338,7 @@ export default function StudentPortal() {
           is_silence: false,
           is_giveup: isGiveup,
           is_hint_request: isHintReq,
-          code_snippet: submittedCode || null,
+          code_snippet: effectiveCode || null,
           audio_chunk_url: recordedAudioUrl,
           wpm: acousticMetrics.wpm > 0 ? acousticMetrics.wpm : 125.0,
           filler_words: acousticMetrics.fillerCounts,
@@ -375,10 +351,10 @@ export default function StudentPortal() {
       setQuestionType(data.question_type);
       setLastLatencyMs(data.latency_ms);
 
-      // Auto open whiteboard if question is applied/code
-      if (['APPLIED', 'DEBUGGING', 'EDGE_CASE'].includes(data.question_type)) {
-        setShowCodePad(true);
-      }
+      // Advance step indicator
+      if (currentStep === 1) setCurrentStep(2); // Move to Strong Topic
+      else if (currentStep === 2) setCurrentStep(3); // Move to Strong Questions
+      else if (currentStep === 3 && data.ai_response_text.includes('next topic')) setCurrentStep(4);
 
       setTranscriptFeed(prev => [
         ...prev,
@@ -432,147 +408,111 @@ export default function StudentPortal() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Remaining time for 15-minute countdown
-  const totalLimitSec = (durationMinutes || 15) * 60;
+  const totalLimitSec = durationMinutes * 60;
   const remainingSec = Math.max(0, totalLimitSec - elapsedSeconds);
-  const isTimeCritical = remainingSec <= 120 && durationMinutes > 0;
-  const isTimeWarning = remainingSec <= 300 && durationMinutes > 0;
+  const isTimeCritical = remainingSec <= 120;
+  const isTimeWarning = remainingSec <= 300;
 
-  // 1. Pre-Viva Check-in Screen (Dominant White & Mixed Cosmic Theme)
+  // =========================================================================
+  // 1. CLEAN LANDING & REGISTRATION PAGE WITH 3D SOLAR SYSTEM
+  // =========================================================================
   if (!isStarted) {
     return (
-      <div style={{ maxWidth: '980px', margin: '36px auto', padding: '0 24px' }}>
-        <div className="glass-panel" style={{ padding: '36px 40px', background: '#FFFFFF' }}>
+      <div style={{ maxWidth: '1060px', margin: '36px auto', padding: '0 24px' }}>
+        {/* Clean Registration Card */}
+        <div className="glass-panel" style={{ padding: '36px 40px', background: '#FFFFFF', marginBottom: '28px' }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
-                width: '54px',
-                height: '54px',
-                borderRadius: '16px',
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
                 background: 'radial-gradient(circle at 35% 35%, #FFE9B8, var(--sun) 55%, #D97706)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.35)'
+                boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)'
               }}>
-                <Shield size={26} color="#FFFFFF" />
+                <Shield size={24} color="#FFFFFF" />
               </div>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="eyebrow" style={{ fontSize: '0.7rem' }}>
-                    STANDARDIZED TECHNICAL VIVA
-                  </span>
-                  <span className="badge badge-dark" style={{ fontSize: '9px' }}>
-                    DSA & WEB DEV ONLY
-                  </span>
-                </div>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '22px', fontWeight: 800, marginTop: '2px' }} className="sheen-text">
-                  Candidate Check-in & Oral Exam Room
-                </h2>
+                <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
+                  STANDARDIZED TECHNICAL EVALUATION
+                </span>
+                <h1 style={{ fontFamily: 'var(--display)', fontSize: '24px', fontWeight: 800, marginTop: '2px' }} className="sheen-text">
+                  Candidate Registration & Viva Arena
+                </h1>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="btn btn-secondary"
-              style={{ fontSize: '12px' }}
-            >
-              <Settings size={14} />
-              Sweet Voice Settings
-            </button>
+            <span className="badge badge-dark" style={{ fontSize: '10px' }}>
+              15:00 TIMED ARENA
+            </span>
           </div>
 
-          {/* Subject Selector: DSA vs Web Development */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: '12px' }}>
-              Select Viva Examination Subject (Strictly DSA or Web Development)
+          {/* Clean Domain Choice: DSA vs Web Development Only */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: '10px' }}>
+              Select Examination Track:
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* DSA Option */}
-              <div
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <button
+                type="button"
                 onClick={() => setSelectedDomain('dsa')}
                 style={{
-                  padding: '20px',
+                  padding: '16px 20px',
                   borderRadius: 'var(--radius-md)',
                   border: `2px solid ${selectedDomain === 'dsa' ? 'var(--sun)' : 'var(--rule)'}`,
                   background: selectedDomain === 'dsa' ? '#FFFBEB' : '#FFFFFF',
                   cursor: 'pointer',
+                  textAlign: 'left',
                   transition: 'all 0.2s ease',
-                  boxShadow: selectedDomain === 'dsa' ? '0 4px 16px rgba(245, 158, 11, 0.18)' : 'var(--shadow-sm)'
+                  boxShadow: selectedDomain === 'dsa' ? '0 4px 14px rgba(245, 158, 11, 0.18)' : 'var(--shadow-sm)'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
-                    Data Structures & Algorithms (DSA)
+                    DSA (Data Structures & Algorithms)
                   </span>
-                  {selectedDomain === 'dsa' && (
-                    <span className="badge badge-amber" style={{ fontSize: '10px' }}>
-                      <CheckCircle2 size={12} /> Selected
-                    </span>
-                  )}
+                  {selectedDomain === 'dsa' && <CheckCircle2 size={16} color="#D97706" />}
                 </div>
-                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
-                  Arrays, Hash Maps, BST/AVL Rotations, Dynamic Programming (Knapsack), Kahn's Graph Cycles, Big-O trade-offs.
-                </p>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-purple" style={{ fontSize: '9px' }}>Trees & Graphs</span>
-                  <span className="badge badge-cyan" style={{ fontSize: '9px' }}>DP Optimization</span>
-                  <span className="badge badge-amber" style={{ fontSize: '9px' }}>O(1) Hashing</span>
+                <div style={{ fontSize: '12px', color: 'var(--ink-secondary)' }}>
+                  Problem solving, complexity analysis & algorithmic implementations.
                 </div>
-              </div>
+              </button>
 
-              {/* Web Development Option */}
-              <div
+              <button
+                type="button"
                 onClick={() => setSelectedDomain('webdev')}
                 style={{
-                  padding: '20px',
+                  padding: '16px 20px',
                   borderRadius: 'var(--radius-md)',
                   border: `2px solid ${selectedDomain === 'webdev' ? 'var(--nebula)' : 'var(--rule)'}`,
                   background: selectedDomain === 'webdev' ? '#EEF2FF' : '#FFFFFF',
                   cursor: 'pointer',
+                  textAlign: 'left',
                   transition: 'all 0.2s ease',
-                  boxShadow: selectedDomain === 'webdev' ? '0 4px 16px rgba(99, 102, 241, 0.18)' : 'var(--shadow-sm)'
+                  boxShadow: selectedDomain === 'webdev' ? '0 4px 14px rgba(99, 102, 241, 0.18)' : 'var(--shadow-sm)'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--ink)' }}>
-                    Web Development & Full-Stack Systems
+                    Web Development & Systems
                   </span>
-                  {selectedDomain === 'webdev' && (
-                    <span className="badge badge-purple" style={{ fontSize: '10px' }}>
-                      <CheckCircle2 size={12} /> Selected
-                    </span>
-                  )}
+                  {selectedDomain === 'webdev' && <CheckCircle2 size={16} color="#4F46E5" />}
                 </div>
-                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
-                  React 19 Virtual DOM & Fiber, Node.js Event Loop Microtasks, REST Idempotency, WebSockets, DB Indexing & ACID.
-                </p>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-cyan" style={{ fontSize: '9px' }}>React Fiber</span>
-                  <span className="badge badge-purple" style={{ fontSize: '9px' }}>Event Loop</span>
-                  <span className="badge badge-emerald" style={{ fontSize: '9px' }}>B-Tree Indexing</span>
+                <div style={{ fontSize: '12px', color: 'var(--ink-secondary)' }}>
+                  Full-stack architecture, asynchronous workflows & data persistence.
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
-          {/* Student ID & Name */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+          {/* Candidate Name & Roll Number Input */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '24px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
-                Candidate Student ID
-              </label>
-              <input
-                className="input-field mono"
-                value={studentId}
-                onChange={e => setStudentId(e.target.value.toUpperCase())}
-                placeholder="e.g. STU001"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
                 Candidate Full Name
               </label>
               <input
@@ -582,142 +522,111 @@ export default function StudentPortal() {
                 placeholder="e.g. Rahul Sharma"
               />
             </div>
-          </div>
 
-          {/* Sweet Voice Persona Indicator */}
-          <div style={{
-            background: '#FDF2F8',
-            border: '1px solid rgba(225, 29, 72, 0.25)',
-            borderRadius: 'var(--radius-md)',
-            padding: '14px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span className="sun-pulse" style={{ background: '#E11D48', boxShadow: '0 0 10px #E11D48' }} />
-              <div>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
-                  Interviewer Voice: {selectedPersona === 'grok_sweet' ? 'Grok Sweet AI (Bright & Youthful)' : selectedPersona === 'aria' ? 'Aria Sweet (Warm & Cheerful)' : selectedPersona === 'maya' ? 'Maya (Youthful Tech Lead)' : 'Zara (Sweet Socratic)'}
-                </span>
-                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                  Sweet young female voice tuned at pitch 1.22x with Web Speech synthesis • Zero male voices
-                </div>
-              </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
+                Roll Number
+              </label>
+              <input
+                className="input-field mono"
+                value={rollNumber}
+                onChange={e => setRollNumber(e.target.value.toUpperCase())}
+                placeholder="e.g. 21BCSE104"
+              />
             </div>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '4px 12px' }}
-            >
-              Test Voice
-            </button>
           </div>
 
-          {/* Hard 15-Minute Rule Notice */}
-          <div style={{
-            background: '#F8FAFC',
-            border: '1px solid var(--rule)',
-            borderRadius: 'var(--radius-md)',
-            padding: '16px 20px',
-            marginBottom: '24px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={16} color="var(--ice)" />
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
-                  Hard 15-Minute Exam Duration
-                </span>
-              </div>
-              <span className="badge badge-dark" style={{ fontSize: '10px' }}>
-                15:00 Countdown Limit
-              </span>
-            </div>
-            <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: 0, lineHeight: '1.5' }}>
-              The viva adheres strictly to a 15-minute countdown. The AI will navigate adaptive topic trees, dig deeper into strong responses, advance gracefully on weak ones, and wrap up automatically at 0:00 with full multi-dimensional rubric marks.
-            </p>
-          </div>
-
-          {/* Mandatory Academic Consent Checkbox (Unlocks Entry Box / Start) */}
+          {/* Academic Consent */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '16px',
-            padding: '20px',
+            gap: '14px',
+            padding: '16px 20px',
             background: consentGiven ? '#F0FDF4' : '#F8FAFC',
-            border: `2px solid ${consentGiven ? '#10B981' : 'var(--rule)'}`,
+            border: `1.5px solid ${consentGiven ? '#10B981' : 'var(--rule)'}`,
             borderRadius: 'var(--radius-md)',
-            marginBottom: '28px',
-            transition: 'all 0.2s ease'
+            marginBottom: '28px'
           }}>
-            <label htmlFor="consent" style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', cursor: 'pointer', flex: 1 }}>
+            <label htmlFor="consent" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', flex: 1 }}>
               <input
                 type="checkbox"
                 id="consent"
                 checked={consentGiven}
                 onChange={e => setConsentGiven(e.target.checked)}
-                style={{ marginTop: '3px', width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
+                style={{ marginTop: '2px', width: '20px', height: '20px', accentColor: '#10B981', cursor: 'pointer' }}
               />
               <div>
-                <span style={{ fontSize: '14px', fontWeight: 800, color: consentGiven ? '#047857' : 'var(--ink)' }}>
-                  {consentGiven ? 'Academic Consent Acknowledged & Verified' : 'Check to Agree & Unlock Viva Examination'}
+                <span style={{ fontSize: '13px', fontWeight: 800, color: consentGiven ? '#047857' : 'var(--ink)' }}>
+                  {consentGiven ? 'Consent Acknowledged' : 'Click to Agree & Authorize Examination'}
                 </span>
-                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                  I consent to audio recording, timestamped speech transcription, and proctoring telemetry (tab-switch & silence tracking) for faculty evaluation.
+                <p style={{ fontSize: '12px', color: 'var(--ink-secondary)', margin: '2px 0 0 0', lineHeight: '1.4' }}>
+                  I agree to audio stream recording, front camera proctoring, screen recording capture, and integrity monitoring.
                 </p>
               </div>
             </label>
-            <span className={`badge ${consentGiven ? 'badge-emerald' : 'badge-amber'}`} style={{ whiteSpace: 'nowrap' }}>
-              {consentGiven ? 'Unlocked' : 'Entry Locked'}
+            <span className={`badge ${consentGiven ? 'badge-emerald' : 'badge-amber'}`}>
+              {consentGiven ? 'Ready' : 'Pending'}
             </span>
           </div>
 
-          {/* Action button */}
+          {/* AI INTERVIEW START Button (Singularity Celestial Glow from rishiraj38.github.io) */}
           <button
             onClick={handleStartViva}
-            disabled={!consentGiven || !studentName.trim() || !studentId.trim()}
-            className="btn btn-primary"
+            disabled={!consentGiven || !studentName.trim() || !rollNumber.trim()}
             style={{
               width: '100%',
-              padding: '16px',
+              padding: '18px 28px',
+              borderRadius: '999px',
+              background: consentGiven ? '#0F172A' : '#94A3B8',
+              color: '#FFFFFF',
+              fontFamily: 'var(--display)',
               fontSize: '15px',
               fontWeight: 800,
-              letterSpacing: '0.02em',
-              background: consentGiven ? '#0F172A' : '#94A3B8',
-              cursor: consentGiven ? 'pointer' : 'not-allowed'
+              letterSpacing: '0.04em',
+              border: consentGiven ? '1.5px solid rgba(255, 255, 255, 0.25)' : 'none',
+              boxShadow: consentGiven ? '0 0 25px rgba(99, 102, 241, 0.4), 0 8px 24px rgba(15, 23, 42, 0.3)' : 'none',
+              cursor: consentGiven ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
-            {consentGiven ? 'Start Adaptive Technical Viva (15-Min)' : 'Please Agree to Consent Above to Unlock'}
+            <span className="sun-pulse" style={{ width: '10px', height: '10px', background: '#F59E0B' }} />
+            <span>AI INTERVIEW START</span>
+            <ArrowRight size={18} />
           </button>
         </div>
 
-        {/* Voice Settings Modal */}
-        <VoiceSettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          selectedPersona={selectedPersona}
-          onSelectPersona={setSelectedPersona}
-          sttEngine={sttEngine}
-          onSelectSttEngine={setSttEngine}
-          speechRate={speechRate}
-          onChangeSpeechRate={setSpeechRate}
-        />
+        {/* 3D Solar System Animation from rishiraj38.github.io */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '0 8px' }}>
+            <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
+              3D GRAVITATIONAL CELESTIAL ENGINE
+            </span>
+            <span className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>
+              Interactive Orbit Simulation
+            </span>
+          </div>
+          <SolarSystem3D height="440px" />
+        </div>
       </div>
     );
   }
 
-  // 2. Active Viva Room Interface (White & Mixed Cosmic Theme)
+  // =========================================================================
+  // 2. ACTIVE VIVA ARENA: HACKERRANK SPLIT VIEW (LEFT: QUESTION, RIGHT: CODE)
+  // =========================================================================
   return (
-    <div style={{ maxWidth: '1440px', margin: '24px auto', padding: '0 24px' }}>
-      {/* Top Session Bar with Hard 15-Minute Countdown */}
-      <div className="glass-panel" style={{ padding: '16px 24px', marginBottom: '20px', background: '#FFFFFF' }}>
+    <div style={{ maxWidth: '1680px', margin: '20px auto', padding: '0 24px' }}>
+      {/* Top Header Bar with 15-Minute Countdown */}
+      <div className="glass-panel" style={{ padding: '14px 24px', marginBottom: '18px', background: '#FFFFFF' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
-          {/* Time & Phase */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Hard 15-Minute Countdown Display */}
+          {/* Left: Step & Student Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* 15-Minute Countdown Badge */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -729,11 +638,11 @@ export default function StudentPortal() {
             }}>
               <Clock size={16} color={isTimeCritical ? '#EF4444' : isTimeWarning ? '#F59E0B' : 'var(--ink)'} />
               <span className="mono" style={{
-                fontSize: '16px',
+                fontSize: '15px',
                 fontWeight: 800,
                 color: isTimeCritical ? '#EF4444' : isTimeWarning ? '#B45309' : 'var(--ink)'
               }}>
-                {formatTime(remainingSec)} left
+                {formatTime(remainingSec)}
               </span>
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
                 / 15:00
@@ -741,78 +650,57 @@ export default function StudentPortal() {
             </div>
 
             <span className="badge badge-dark">
-              {selectedDomain === 'webdev' ? 'Web Development Viva' : 'DSA Technical Viva'}
+              {selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track'}
             </span>
 
-            <span className="badge badge-purple">
-              {currentPhase}
+            {/* Step Progress Pill */}
+            <span className="badge badge-purple" style={{ fontSize: '11px' }}>
+              {currentStep === 1 && 'Step 1: Introduction'}
+              {currentStep === 2 && 'Step 2: Declare Strong Topic'}
+              {currentStep === 3 && 'Step 3: Strong Topic Depth'}
+              {currentStep >= 4 && 'Step 4: Broad Adaptive Probing'}
             </span>
           </div>
 
-          {/* Progress bar */}
-          <div style={{ flex: 1, maxWidth: '360px', height: '8px', background: '#F1F5F9', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{
-              width: `${Math.min(100, (elapsedSeconds / totalLimitSec) * 100)}%`,
-              height: '100%',
-              background: isTimeCritical ? '#EF4444' : 'linear-gradient(90deg, var(--nebula), var(--ice))',
-              borderRadius: '999px',
-              transition: 'width 1s linear'
-            }} />
-          </div>
-
-          {/* Quick Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              onClick={() => setShowCodePad(!showCodePad)}
-              className={`btn ${showCodePad ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '12px', padding: '6px 14px' }}
-            >
-              <Code2 size={14} />
-              {showCodePad ? 'Hide Code Pad' : 'Open Code Pad'}
-            </button>
-
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '6px 14px' }}
-            >
-              <Settings size={14} />
-              Voice
-            </button>
+          {/* Candidate Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span className="mono" style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>
+              {studentName} ({rollNumber})
+            </span>
 
             <button
               onClick={() => handleEndViva()}
               className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '6px 14px', color: '#BE123C' }}
+              style={{ fontSize: '11px', padding: '5px 12px', color: '#BE123C' }}
             >
-              Conclude Viva
+              Conclude Exam Early
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tab Switch Alert (Integrity Alert) */}
+      {/* Tab Switch Alert (Anti-Cheating) */}
       {tabSwitchAlert && (
         <div style={{
           background: '#FFF1F2',
           border: '1.5px solid #E11D48',
           borderRadius: 'var(--radius-md)',
-          padding: '12px 18px',
+          padding: '10px 16px',
           marginBottom: '16px',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: '10px',
           fontSize: '13px',
           color: '#9F1239'
         }}>
           <AlertTriangle size={18} color="#E11D48" />
           <span>
-            <strong>Integrity Warning:</strong> Tab switch detected (#{tabSwitchCount}). Your examiner and faculty review board have been notified. Please stay focused on the viva window.
+            <strong>Anti-Cheating Notice:</strong> Window unfocused (#{tabSwitchCount}). Focus loss logged to audit records.
           </span>
         </div>
       )}
 
-      {/* Silence Alert */}
+      {/* Silence Nudge Alert */}
       {silenceNotice && (
         <div style={{
           background: '#FFFBEB',
@@ -836,27 +724,30 @@ export default function StudentPortal() {
             className="btn btn-primary"
             style={{ fontSize: '11px', padding: '4px 12px' }}
           >
-            Submit Now
+            Submit Answer
           </button>
         </div>
       )}
 
-      {/* Main Examination Grid */}
+      {/* =====================================================================
+          HACKERRANK SPLIT VIEW: LEFT (QUESTION & SPEECH) | RIGHT (CODE ARENA)
+          ===================================================================== */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: showCodePad ? '1fr 1fr 1fr' : '1.2fr 1fr',
-        gap: '20px'
+        gridTemplateColumns: 'minmax(420px, 45%) minmax(500px, 55%)',
+        gap: '20px',
+        alignItems: 'start'
       }}>
-        {/* Left Column: AI Examiner & Active Question */}
-        <div>
-          {/* Active Question Card */}
-          <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px', background: '#FFFFFF' }}>
+        {/* LEFT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Question Card */}
+          <div className="glass-panel" style={{ padding: '24px', background: '#FFFFFF' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="badge badge-purple">{questionType} QUESTION</span>
+                <span className="badge badge-purple">{questionType}</span>
                 {lastLatencyMs && (
                   <span className="mono" style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-                    ⚡ Turnaround: {lastLatencyMs}ms
+                    ⚡ {lastLatencyMs}ms turnaround
                   </span>
                 )}
               </div>
@@ -865,7 +756,7 @@ export default function StudentPortal() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Volume2 size={16} color="var(--ice)" />
                   <span style={{ fontSize: '12px', color: 'var(--ice)', fontWeight: 700 }}>
-                    Sweet Voice Speaking...
+                    Examiner Speaking...
                   </span>
                 </div>
               )}
@@ -880,38 +771,39 @@ export default function StudentPortal() {
               />
             </div>
 
-            {/* Question Text */}
+            {/* Question Text Box */}
             <div style={{
               background: '#F8FAFC',
               border: '1px solid var(--rule)',
               borderRadius: 'var(--radius-md)',
-              padding: '20px',
+              padding: '18px',
               marginBottom: '16px'
             }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--nebula)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>
-                Examiner Probe:
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--nebula)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Examiner Question:
               </div>
               <p style={{
                 fontFamily: 'var(--body)',
-                fontSize: '17px',
+                fontSize: '16px',
                 fontWeight: 600,
                 color: 'var(--ink)',
-                lineHeight: '1.5'
+                lineHeight: '1.5',
+                margin: 0
               }}>
-                {aiQuestion || 'Listening to your thoughts...'}
+                {aiQuestion || 'Connecting to viva engine...'}
               </p>
             </div>
 
-            {/* Candidate Spoken Input / Entry Box */}
+            {/* Spoken Answer Input Area */}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)' }}>
-                  Your Spoken Answer (Hindi/Hinglish Supported):
+                <label style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  Spoken Answer (Hindi/Hinglish Supported):
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span className="sun-pulse" style={{ width: '7px', height: '7px', background: isListening ? '#10B981' : '#94A3B8' }} />
                   <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>
-                    {isListening ? 'Voice Catching Active' : 'Microphone Inactive'}
+                    {isListening ? 'Voice Catching Active' : 'Mic Off'}
                   </span>
                 </div>
               </div>
@@ -919,14 +811,14 @@ export default function StudentPortal() {
               <textarea
                 value={studentInput}
                 onChange={e => setStudentInput(e.target.value)}
-                placeholder="Speak naturally into your microphone (English or Hindi/Hinglish), or type here..."
-                rows={4}
+                placeholder="Speak your answer naturally into the microphone, or type here..."
+                rows={3}
                 className="input-field"
-                style={{ fontSize: '14px', lineHeight: '1.5', resize: 'vertical' }}
+                style={{ fontSize: '13px', lineHeight: '1.45', resize: 'vertical' }}
               />
             </div>
 
-            {/* Actions Bar */}
+            {/* Question Action Buttons */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -934,9 +826,9 @@ export default function StudentPortal() {
                   onClick={() => handleTurnSubmit(false, true)}
                   disabled={isSubmitting}
                   className="btn btn-secondary"
-                  style={{ fontSize: '12px', padding: '7px 14px' }}
+                  style={{ fontSize: '11px', padding: '6px 12px' }}
                 >
-                  <HelpCircle size={14} color="var(--sun)" />
+                  <HelpCircle size={13} color="var(--sun)" />
                   Ask Socratic Hint
                 </button>
 
@@ -945,10 +837,10 @@ export default function StudentPortal() {
                   onClick={() => handleTurnSubmit(true, false)}
                   disabled={isSubmitting}
                   className="btn btn-secondary"
-                  style={{ fontSize: '12px', padding: '7px 14px' }}
+                  style={{ fontSize: '11px', padding: '6px 12px' }}
                 >
-                  <FastForward size={14} />
-                  Move to Next Topic
+                  <FastForward size={13} />
+                  Next Topic
                 </button>
               </div>
 
@@ -957,45 +849,42 @@ export default function StudentPortal() {
                 onClick={() => handleTurnSubmit(false, false)}
                 disabled={isSubmitting || (!studentInput.trim() && !codeContent.trim())}
                 className="btn btn-primary"
-                style={{ padding: '8px 24px', fontSize: '13px' }}
+                style={{ padding: '7px 20px', fontSize: '12px' }}
               >
-                <Send size={14} />
-                {isSubmitting ? 'Evaluating...' : 'Submit Answer'}
+                <Send size={13} />
+                {isSubmitting ? 'Evaluating...' : 'Submit Spoken Answer'}
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Center/Middle Column: Code Whiteboard (If Open) */}
-        {showCodePad && (
-          <div>
-            <CodeWhiteboard
-              code={codeContent}
-              onChange={setCodeContent}
-              onRunSimulation={(code) => {
-                setStudentInput(prev => prev ? `${prev}\n[Explained Code Solution]` : '[Explained Code Solution]');
+          {/* Front Camera & Screen Recording Widget (Picture-in-Picture) */}
+          <div className="glass-panel" style={{ padding: '16px 20px', background: '#FFFFFF' }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
+              Anti-Cheating Live Proctors:
+            </div>
+            <ScreenAndCameraRecorder
+              isStarted={isStarted}
+              onIntegrityAlert={(type, details) => {
+                fetch(`${API_BASE}/api/session/integrity`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    session_id: sessionId,
+                    event_type: type,
+                    details: details,
+                    timestamp_sec: elapsedSeconds
+                  })
+                }).catch(e => console.warn(e));
               }}
             />
           </div>
-        )}
 
-        {/* Right Column: Live Transcript Feed & Telemetry */}
-        <div>
-          <div className="glass-panel" style={{ padding: '20px', background: '#FFFFFF', maxHeight: '720px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid var(--rule)', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={16} color="var(--nebula)" />
-                <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--ink)' }}>
-                  Auditable Viva Transcript
-                </span>
-              </div>
-              <span className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                {transcriptFeed.length} turns
-              </span>
+          {/* Transcript History */}
+          <div className="glass-panel" style={{ padding: '18px', background: '#FFFFFF', maxHeight: '340px', overflowY: 'auto' }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
+              Verbatim Viva Transcript:
             </div>
-
-            {/* Transcript Scroll Container */}
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {transcriptFeed.map((item, idx) => {
                 const isExaminer = item.speaker.includes('AI') || item.speaker.includes('Examiner');
                 return (
@@ -1004,62 +893,44 @@ export default function StudentPortal() {
                     style={{
                       background: isExaminer ? '#F8FAFC' : '#EEF2FF',
                       border: `1px solid ${isExaminer ? 'var(--rule)' : 'rgba(99, 102, 241, 0.25)'}`,
-                      borderRadius: 'var(--radius-md)',
-                      padding: '14px',
-                      fontSize: '13px'
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      fontSize: '12px'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 800, color: isExaminer ? 'var(--nebula)' : '#1E1B4B' }}>
-                        {item.speaker}
-                      </span>
-                      <span className="mono" style={{ fontSize: '10px', color: 'var(--muted)' }}>
-                        {item.time}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 800 }}>
+                      <span style={{ color: isExaminer ? 'var(--nebula)' : '#1E1B4B' }}>{item.speaker}</span>
+                      <span className="mono" style={{ fontSize: '10px', color: 'var(--muted)' }}>{item.time}</span>
                     </div>
-                    <p style={{ color: 'var(--ink)', lineHeight: '1.45', margin: 0 }}>
-                      {item.text}
-                    </p>
-                    {item.codeSnippet && (
-                      <pre style={{
-                        marginTop: '8px',
-                        background: '#0B0F19',
-                        color: '#E2E8F0',
-                        padding: '10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        overflowX: 'auto'
-                      }}>
-                        <code>{item.codeSnippet}</code>
-                      </pre>
-                    )}
+                    <p style={{ margin: 0, color: 'var(--ink)' }}>{item.text}</p>
                   </div>
                 );
               })}
             </div>
           </div>
         </div>
+
+        {/* RIGHT COLUMN: FULL HACKERRANK-STYLE CODE WRITING PANEL */}
+        <div style={{ position: 'sticky', top: '90px' }}>
+          <HackerRankCodeEditor
+            subject={selectedDomain}
+            code={codeContent}
+            onChange={setCodeContent}
+            onSubmitSolution={(codeToSubmit) => {
+              handleTurnSubmit(false, false, codeToSubmit);
+            }}
+          />
+        </div>
       </div>
 
-      {/* Voice Settings & Scorecard Modals */}
-      <VoiceSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        selectedPersona={selectedPersona}
-        onSelectPersona={setSelectedPersona}
-        sttEngine={sttEngine}
-        onSelectSttEngine={setSttEngine}
-        speechRate={speechRate}
-        onChangeSpeechRate={setSpeechRate}
-      />
-
+      {/* Final Scorecard Modal */}
       <ScorecardModal
         isOpen={isScorecardOpen}
         onClose={() => setIsScorecardOpen(false)}
         result={completionResult}
         studentName={studentName}
-        studentId={studentId}
-        subjectTitle={selectedDomain === 'webdev' ? 'CS304: Modern Web Development' : 'CS302: Data Structures & Algorithms'}
+        studentId={rollNumber}
+        subjectTitle={selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track'}
       />
     </div>
   );

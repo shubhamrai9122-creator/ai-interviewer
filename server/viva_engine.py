@@ -166,21 +166,63 @@ class VivaEngine:
         - Explores child branches (Correct/Strong vs Socratic Hint)
         - Stops when branch hits terminal leaf, and smoothly transitions to next topic tree
         """
-        # 1. Warm-up Phase
-        if current_phase == SessionPhase.WARMUP:
-            q_count = len(session.questions_asked)
-            if q_count == 0:
-                return (
-                    f"Hello {session.student_name}! I'm Aria, your AI interviewer today. Welcome to your {session.subject_domain or 'technical viva'}! Please take a gentle breath and make sure you're comfortable. To begin our conversation warmly, could you tell me a little bit about a software project or coding assignment you built recently?",
-                    None,
-                    QuestionType.PROJECT
-                )
-            else:
-                return (
-                    "Thank you so much! That sounds really interesting and well-crafted. Now let's dive into our first topic question tree. Are you ready?",
-                    None,
-                    QuestionType.CONCEPT
-                )
+        # 1. Warm-up & Step-by-Step Discovery Phase
+        q_count = len(session.questions_asked)
+        if q_count == 0:
+            # Step 1: Introduction
+            return (
+                f"Hello {session.student_name}! Welcome to your technical viva examination. To get started warmly, please introduce yourself briefly and share a project or area of technology you have recently worked with.",
+                None,
+                QuestionType.PROJECT
+            )
+        elif q_count == 1:
+            # Step 2: Ask candidate which topic they feel strongest in
+            is_web = "web" in (session.subject_domain or "").lower()
+            topic_options = "React Architecture, Node.js Event Loop, or Databases & Storage" if is_web else "Arrays & Hashing, Trees & BSTs, Graph Algorithms, or Dynamic Programming"
+            return (
+                f"Thank you for sharing your background! Before we jump into technical problems, which topic do you feel strongest in? (For example: {topic_options}). I'll start with your forte!",
+                None,
+                QuestionType.CONCEPT
+            )
+        elif q_count == 2:
+            # Step 3: Prioritize candidate's chosen strong topic
+            last_ans = session.student_answers[-1].transcript.lower() if session.student_answers else ""
+            topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).all()
+            matched_topic = None
+
+            # Detect chosen topic from transcript
+            for t in topics:
+                t_words = t.name.lower().split()
+                if any(w in last_ans for w in t_words if len(w) > 3) or t.name.lower() in last_ans:
+                    matched_topic = t
+                    break
+                # Special abbreviations
+                if "dp" in last_ans and "dynamic" in t.name.lower():
+                    matched_topic = t
+                    break
+                if ("react" in last_ans or "dom" in last_ans) and "frontend" in t.name.lower():
+                    matched_topic = t
+                    break
+                if ("node" in last_ans or "api" in last_ans) and "backend" in t.name.lower():
+                    matched_topic = t
+                    break
+
+            if not matched_topic and topics:
+                matched_topic = topics[0]
+
+            if matched_topic:
+                session.current_topic_id = matched_topic.id
+                root_q = self.db.query(Question).filter(
+                    Question.topic_id == matched_topic.id,
+                    Question.tree_depth == 1,
+                    ~Question.id.in_(asked_ids)
+                ).first()
+                if root_q:
+                    return (
+                        f"Great! Let's start with your strong topic: {matched_topic.name}. Here is your first question: {root_q.question_text}",
+                        root_q.id,
+                        root_q.question_type
+                    )
 
         # 2. Wrap-up Phase
         if current_phase == SessionPhase.WRAPUP:
