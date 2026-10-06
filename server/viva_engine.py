@@ -98,9 +98,9 @@ class VivaEngine:
         Returns: (quality, followup_action, detected_concepts, missing_concepts)
         """
         if is_silence:
-            return AnswerQuality.NO_ANSWER, FollowupAction.HINT, [], []
+            return AnswerQuality.NO_ANSWER, FollowupAction.MOVE_ON, [], []
 
-        if is_giveup or "i don't know" in raw_transcript.lower() or "no idea" in raw_transcript.lower() or "skip this" in raw_transcript.lower():
+        if is_giveup or "i don't know" in raw_transcript.lower() or "no idea" in raw_transcript.lower() or "skip this" in raw_transcript.lower() or "move on" in raw_transcript.lower():
             return AnswerQuality.NO_ANSWER, FollowupAction.MOVE_ON, [], []
 
         if is_hint_req or "can you give me a hint" in raw_transcript.lower():
@@ -270,8 +270,38 @@ class VivaEngine:
                 QuestionType.WHY
             )
 
+        if last_action == FollowupAction.MOVE_ON:
+            # Move on gracefully to the next topic or unasked question
+            topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).order_by(Topic.id.asc()).all()
+            for t in topics:
+                root_q = self.db.query(Question).filter(
+                    Question.topic_id == t.id,
+                    Question.tree_depth == 1,
+                    ~Question.id.in_(asked_ids)
+                ).first()
+                if root_q:
+                    session.current_topic_id = t.id
+                    return (
+                        f"No worries at all! Let's move on to our next question on {t.name}: {root_q.question_text}",
+                        root_q.id,
+                        root_q.question_type
+                    )
+
+            # Check unasked approved questions
+            rem_q = self.db.query(Question).filter(
+                Question.viva_id == session.viva_id,
+                Question.status == "APPROVED",
+                ~Question.id.in_(asked_ids)
+            ).first()
+            if rem_q:
+                return (
+                    f"No problem! Let's move forward to this question: {rem_q.question_text}",
+                    rem_q.id,
+                    rem_q.question_type
+                )
+
         # 4. Tree Traversal: Check if last question has child branch nodes in the tree
-        if last_q_id:
+        if last_q_id and last_action != FollowupAction.MOVE_ON:
             last_q = self.db.query(Question).filter(Question.id == last_q_id).first()
             if last_q and not last_q.is_terminal:
                 branch_filter = ["STRONG", "CORRECT"] if last_quality == AnswerQuality.STRONG else ["CORRECT", "STRONG"]

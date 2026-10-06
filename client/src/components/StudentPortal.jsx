@@ -72,6 +72,8 @@ export default function StudentPortal() {
   const audioEngineRef = useRef(null);
   const recognitionRef = useRef(null);
   const lastNudgeTimeRef = useRef(0);
+  const pauseCountRef = useRef(0);
+  const handleTurnSubmitRef = useRef(null);
   const isAiSpeakingRef = useRef(false);
   const aiQuestionRef = useRef('');
 
@@ -222,13 +224,31 @@ export default function StudentPortal() {
             setSilenceNotice(`Sustained silence (${silenceDurationSec}s). Click 'Submit Answer' when ready.`);
           }
 
-          // Proactive AI speech intervention: if candidate has been quiet for > 8s and AI isn't currently speaking
+          // Proactive AI speech intervention:
+          // 1st long pause (7s-10s): Ask if candidate knows the answer or needs help
+          // 2nd sustained pause (15s+): Treat as unable to answer and automatically move to next question
           const now = Date.now();
-          if (duration >= 8.0 && !isAiSpeakingRef.current && (now - lastNudgeTimeRef.current) > 14000) {
+          if (duration >= 7.0 && !isAiSpeakingRef.current && (now - lastNudgeTimeRef.current) > 12000) {
             lastNudgeTimeRef.current = now;
-            const nudgePrompt = "Why are you not speaking? Speak something. I am listening to your answer.";
-            setSilenceNotice("AI Examiner: Why are you not speaking? Speak something.");
-            speakText(nudgePrompt);
+            pauseCountRef.current = (pauseCountRef.current || 0) + 1;
+
+            if (pauseCountRef.current === 1) {
+              const nudgePrompt = "Why are you not speaking? Do you know the answer to this question or should we move forward?";
+              setSilenceNotice("AI Examiner: Why are you not speaking? Do you know the answer or should we move forward?");
+              speakText(nudgePrompt);
+            } else if (pauseCountRef.current >= 2) {
+              // Sustained long pause / no answer given: Move on to next question
+              const movePrompt = "Since you are silent, let's move on to the next question.";
+              setSilenceNotice("AI Examiner: Long pause detected (no answer). Moving to next question...");
+              speakText(movePrompt);
+              pauseCountRef.current = 0;
+              // Submit as giveup/skip so VivaEngine advances
+              if (handleTurnSubmitRef.current) {
+                setTimeout(() => {
+                  handleTurnSubmitRef.current(true, false);
+                }, 1200);
+              }
+            }
           }
         },
         silenceThresholdSec: 3.5,
@@ -342,6 +362,7 @@ export default function StudentPortal() {
   // Submit Answer Turn
   const handleTurnSubmit = async (isGiveup = false, isHintReq = false, explicitCode = null) => {
     if (isSubmitting || !sessionId) return;
+    pauseCountRef.current = 0; // reset pause tracking on submission
     const effectiveCode = explicitCode !== null ? explicitCode : codeContent;
     const answerText = studentInput.trim();
     if (!answerText && !isGiveup && !isHintReq && !effectiveCode.trim()) {
@@ -444,6 +465,10 @@ export default function StudentPortal() {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    handleTurnSubmitRef.current = handleTurnSubmit;
+  });
 
   // End Viva & Run Scoring
   const handleEndViva = async (finalSec = elapsedSeconds) => {
@@ -788,28 +813,16 @@ export default function StudentPortal() {
 
       {/* =====================================================================
           LEETCODE WORKSPACE SPLIT VIEW:
-          LEFT: FULL CODE EDITOR PLATFORM (COVERING ENTIRE LEFT SCREEN)
-          RIGHT: EXAMINER QUESTION PROBE, VOICE CATCHING, PROCTORS & TRANSCRIPT
+          LEFT: EXAMINER QUESTION PROBE, VOICE CATCHING, PROCTORS & TRANSCRIPT
+          RIGHT: FULL CODE EDITOR PLATFORM (COVERING RIGHT SCREEN)
           ===================================================================== */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(600px, 58%) minmax(380px, 42%)',
+        gridTemplateColumns: 'minmax(420px, 44%) minmax(550px, 56%)',
         gap: '20px',
         alignItems: 'start'
       }}>
-        {/* LEFT COLUMN: FULL LEETCODE / HACKERRANK CODE WRITING PLATFORM */}
-        <div style={{ position: 'sticky', top: '80px', height: 'calc(100vh - 120px)', minHeight: '680px' }}>
-          <HackerRankCodeEditor
-            subject={selectedDomain}
-            code={codeContent}
-            onChange={setCodeContent}
-            onSubmitSolution={(codeToSubmit) => {
-              handleTurnSubmit(false, false, codeToSubmit);
-            }}
-          />
-        </div>
-
-        {/* RIGHT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
+        {/* LEFT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* Question Card */}
           <div className="glass-panel" style={{ padding: '24px', background: '#FFFFFF' }}>
@@ -1005,6 +1018,18 @@ export default function StudentPortal() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* RIGHT COLUMN: FULL LEETCODE / HACKERRANK CODE WRITING PLATFORM */}
+        <div style={{ position: 'sticky', top: '80px', height: 'calc(100vh - 120px)', minHeight: '680px' }}>
+          <HackerRankCodeEditor
+            subject={selectedDomain}
+            code={codeContent}
+            onChange={setCodeContent}
+            onSubmitSolution={(codeToSubmit) => {
+              handleTurnSubmit(false, false, codeToSubmit);
+            }}
+          />
         </div>
       </div>
 
