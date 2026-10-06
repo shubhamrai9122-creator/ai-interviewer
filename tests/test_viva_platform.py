@@ -200,5 +200,90 @@ class TestAIVivaPlatform(unittest.TestCase):
         unlimited_phase = engine.calculate_phase(elapsed_sec=3600, duration_minutes=0, questions_asked_count=6)
         self.assertEqual(unlimited_phase, SessionPhase.DEPTH)
 
+    def test_11_ai_technical_interviewer_master_flow(self):
+        """Verify master AI Technical Interviewer flow: Section 19 intro, progressive hints, and Section 17 scoring."""
+        from server.main import start_viva_session, end_viva_session
+        from server.models import StudentStartRequest
+        from fastapi import BackgroundTasks
+
+        # 1. Start session: greeting must inquire about background, preferred area, and level (Section 19)
+        start_req = StudentStartRequest(
+            student_id="TEST_INTERVIEW_AI",
+            student_name="Devika Sen",
+            viva_id=42,
+            consent_given=True,
+            examiner_persona="aria",
+            subject_domain="DSA & Web Development",
+            duration_minutes=15
+        )
+        start_res = start_viva_session(start_req, db=self.db)
+        s_id = start_res["session_id"]
+        self.assertIn("AI Technical Interviewer", start_res["first_question"])
+        self.assertIn("Data Structures & Algorithms (DSA) or Web Development", start_res["first_question"])
+        self.assertIn("Beginner, Intermediate, or Advanced", start_res["first_question"])
+
+        # 2. Turn 1: Candidate introduces background, chooses DSA at Intermediate level
+        engine = VivaEngine(self.db)
+        turn1 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=30,
+            student_transcript="Hi! I have 2 years of experience with Python and JavaScript. I would like to focus on DSA at an Intermediate level."
+        )
+        self.assertIn("ai_response_text", turn1)
+        self.assertIn("Linked List", turn1["ai_response_text"])
+
+        # 3. Turn 2: Warm-up answer -> Advances to formatted DSA problem
+        turn2 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=90,
+            student_transcript="Arrays provide contiguous memory with O(1) random access, while linked lists use node pointers requiring O(N) traversal."
+        )
+        self.assertIn("**Problem Statement:**", turn2["ai_response_text"])
+        self.assertIn("**Input Description:**", turn2["ai_response_text"])
+        self.assertIn("**Constraints:**", turn2["ai_response_text"])
+
+        # 4. Turn 3: Candidate requests a progressive hint (Section 6)
+        turn3 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=150,
+            student_transcript="Could you give me a small hint to get started?",
+            is_hint_req=True
+        )
+        self.assertIn("[Hint Level 1]:", turn3["ai_response_text"])
+        self.assertEqual(turn3["hints_used"], 1)
+
+        # 5. Turn 4: Candidate explains approach before code (Section 3 & 5)
+        turn4 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=220,
+            student_transcript="I observe that we can use a two-pointer sliding window with a hash map to keep track of character frequencies in O(N) time and O(N) space."
+        )
+        self.assertIn("code editor", turn4["ai_response_text"].lower())
+
+        # 6. Turn 5: Candidate submits code in editor (Section 13)
+        code = "def lengthOfLongestSubstring(s: str) -> int:\n    seen = {}\n    left = 0\n    max_len = 0\n    for right, c in enumerate(s):\n        if c in seen and seen[c] >= left:\n            left = seen[c] + 1\n        seen[c] = right\n        max_len = max(max_len, right - left + 1)\n    return max_len"
+        turn5 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=350,
+            student_transcript="I have implemented the sliding window in the editor with O(N) time.",
+            code_snippet=code
+        )
+        self.assertIn("edge cases", turn5["ai_response_text"].lower())
+
+        # 7. End viva and verify Section 17 Scorecard
+        scorer = ScoringWorker(self.db)
+        score_res = scorer.evaluate_session(s_id)
+        self.assertGreater(score_res.total_score, 0)
+        self.assertGreater(score_res.dsa_score, 0)
+        self.assertGreater(score_res.web_dev_score, 0)
+        self.assertIsNotNone(score_res.evaluation_report)
+        self.assertIn("subscores", score_res.evaluation_report)
+        self.assertIn("problem_solving", score_res.evaluation_report["subscores"])
+        self.assertIn("complexity_analysis", score_res.evaluation_report["subscores"])
+        self.assertIn("category_breakdown", score_res.evaluation_report)
+        self.assertIn("strongest_areas", score_res.evaluation_report)
+        self.assertIn("weakest_areas", score_res.evaluation_report)
+        self.assertIn("suggested_difficulty", score_res.evaluation_report)
+
 if __name__ == "__main__":
     unittest.main()

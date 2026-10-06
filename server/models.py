@@ -135,6 +135,9 @@ class VivaSession(Base):
     scoring_prompt_version = Column(String(50), default="v1.0.0")
     examiner_persona = Column(String(50), default="aria")
     subject_domain = Column(String(100), default="Data Structures & Algorithms")
+    interview_profile = Column(JSON, default=dict)
+    interview_level = Column(String(50), default="Intermediate")
+    preferred_domain = Column(String(50), default="dsa")
 
     viva = relationship("Viva", back_populates="sessions")
     questions_asked = relationship("QuestionAsked", back_populates="session", cascade="all, delete-orphan")
@@ -189,8 +192,18 @@ class VivaScore(Base):
     practical = Column(Float, nullable=False)        # 0 to 5, Weight: 15%
     communication = Column(Float, nullable=False)    # 0 to 5, Weight: 10%
     total_score = Column(Float, nullable=False)      # Out of 100
+    dsa_score = Column(Float, default=0.0)           # Out of 100
+    web_dev_score = Column(Float, default=0.0)       # Out of 100
+    problem_solving_10 = Column(Float, default=0.0)  # /10
+    communication_10 = Column(Float, default=0.0)    # /10
+    technical_depth_10 = Column(Float, default=0.0)  # /10
+    code_quality_10 = Column(Float, default=0.0)     # /10
+    complexity_analysis_10 = Column(Float, default=0.0) # /10
+    debugging_10 = Column(Float, default=0.0)        # /10
+    adaptability_10 = Column(Float, default=0.0)     # /10
     confidence = Column(Float, default=0.95)
-    feedback = Column(Text, nullable=True)           # 3-5 lines
+    feedback = Column(Text, nullable=True)           # Detailed evaluation summary
+    evaluation_report = Column(JSON, default=dict)   # Full Section 17 report
     scoring_prompt_version = Column(String(50), default="v1.0.0")
     created_at = Column(Float, default=time.time)
 

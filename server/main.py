@@ -622,29 +622,23 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(session)
 
-    # Tailored persona greeting
-    if persona_key == "aria":
-        duration_phrase = f"{duration_mins}-minute" if duration_mins > 0 else "comprehensive"
-        opener_text = (
-            f"Hi {session.student_name}! I'm Aria, your AI interviewer today. I'm really glad to meet you! "
-            f"We'll explore your knowledge of {subject_label} in a friendly, conversational way. "
-            "Whenever you're ready, please share a quick introduction and tell me about a project or algorithm you've enjoyed working on recently."
-        )
-    elif persona_key == "alex":
-        opener_text = (
-            f"Hey {session.student_name}, I'm Alex Sterling. Welcome to your technical interview on {subject_label}. "
-            "Microphone check looks solid. Let's dive right in: give me a crisp 60-second walkthrough of a software project or system you've engineered recently."
-        )
-    elif persona_key == "priya":
-        opener_text = (
-            f"Namaste {session.student_name}! I am Prof. Priya Nair. Welcome to your {subject_label} viva. "
-            "Please ensure your microphone is steady and you're comfortable. To begin our conversation, tell me about an interesting project or algorithm you built recently."
-        )
-    else:
-        opener_text = (
-            f"Greetings {session.student_name}. I am Dr. Eleanor Vance. Welcome to your {subject_label} oral examination. "
-            "Please confirm your recording consent and audio clarity. To begin, tell me briefly about a software project or data structures assignment you've built recently."
-        )
+    # Natural Interviewer greeting strictly aligned with Section 19
+    persona_names = {
+        "aria": "Aria",
+        "grok_sweet": "Grok AI",
+        "maya": "Maya",
+        "zara": "Zara",
+        "alex": "Alex Sterling",
+        "priya": "Prof. Priya Nair",
+        "eleanor": "Dr. Eleanor Vance"
+    }
+    p_name = persona_names.get(persona_key, "Aria")
+    opener_text = (
+        f"Hello {session.student_name}! I am {p_name}, your AI Technical Interviewer today. "
+        "Welcome to your technical interview. To help tailor our session, could you briefly introduce yourself, "
+        "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
+        "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
+    )
 
     first_qa = QuestionAsked(
         session_id=session.id,
@@ -716,6 +710,18 @@ def end_viva_session(session_id: int, background_tasks: BackgroundTasks, db: Ses
         "status": "completed",
         "session_id": session.id,
         "final_score": score_result.total_score,
+        "dsa_score": score_result.dsa_score,
+        "web_dev_score": score_result.web_dev_score,
+        "subscores": {
+            "problem_solving": score_result.problem_solving_10,
+            "communication": score_result.communication_10,
+            "technical_depth": score_result.technical_depth_10,
+            "code_quality": score_result.code_quality_10,
+            "complexity_analysis": score_result.complexity_analysis_10,
+            "debugging": score_result.debugging_10,
+            "adaptability": score_result.adaptability_10
+        },
+        "evaluation_report": score_result.evaluation_report,
         "confidence": score_result.confidence,
         "feedback": score_result.feedback,
         "flagged_for_review": session.flagged_for_review,
@@ -849,6 +855,18 @@ def get_faculty_session_audit(session_id: int, db: Session = Depends(get_db)):
             "practical": session.score.practical,
             "communication": session.score.communication,
             "total_score": session.score.total_score,
+            "dsa_score": session.score.dsa_score,
+            "web_dev_score": session.score.web_dev_score,
+            "subscores": {
+                "problem_solving": session.score.problem_solving_10,
+                "communication": session.score.communication_10,
+                "technical_depth": session.score.technical_depth_10,
+                "code_quality": session.score.code_quality_10,
+                "complexity_analysis": session.score.complexity_analysis_10,
+                "debugging": session.score.debugging_10,
+                "adaptability": session.score.adaptability_10
+            },
+            "evaluation_report": session.score.evaluation_report,
             "confidence": session.score.confidence,
             "feedback": session.score.feedback,
             "scoring_prompt_version": session.score.scoring_prompt_version

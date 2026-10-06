@@ -439,10 +439,21 @@ export default function StudentPortal() {
       setQuestionType(data.question_type);
       setLastLatencyMs(data.latency_ms);
 
-      // Advance step indicator
-      if (currentStep === 1) setCurrentStep(2); // Move to Strong Topic
-      else if (currentStep === 2) setCurrentStep(3); // Move to Strong Questions
-      else if (currentStep === 3 && data.ai_response_text.includes('next topic')) setCurrentStep(4);
+      // Advance step indicator aligned with Section 16 & 19
+      const resp = data.ai_response_text || '';
+      if (resp.includes('Web Development') || resp.includes('authentication using JWT') || resp.includes('React frontend and Express')) {
+        setCurrentStep(5);
+      } else if (resp.includes('Problem Statement:')) {
+        setCurrentStep(3);
+      } else if (resp.includes('code editor') || resp.includes('write out your implementation')) {
+        setCurrentStep(4);
+      } else if (resp.includes('conclude') || data.is_viva_completed) {
+        setCurrentStep(7);
+      } else if (currentStep === 1) {
+        setCurrentStep(2);
+      } else if (currentStep === 5) {
+        setCurrentStep(6);
+      }
 
       setTranscriptFeed(prev => [
         ...prev,
@@ -737,10 +748,13 @@ export default function StudentPortal() {
 
             {/* Step Progress Pill */}
             <span className="badge badge-purple" style={{ fontSize: '11px' }}>
-              {currentStep === 1 && 'Step 1: Introduction'}
-              {currentStep === 2 && 'Step 2: Declare Strong Topic'}
-              {currentStep === 3 && 'Step 3: Strong Topic Depth'}
-              {currentStep >= 4 && 'Step 4: Broad Adaptive Probing'}
+              {currentStep === 1 && 'Step 1: Introduction & Discovery'}
+              {currentStep === 2 && 'Step 2: Technical Foundations Warm-up'}
+              {currentStep === 3 && 'Step 3: DSA Problem & Approach Reasoning'}
+              {currentStep === 4 && 'Step 4: Implementation in Code Editor'}
+              {currentStep === 5 && 'Step 5: Web Development Systems Scenario'}
+              {currentStep === 6 && 'Step 6: Architecture & Security Probing'}
+              {currentStep >= 7 && 'Step 7: Final Comprehensive Evaluation'}
             </span>
           </div>
 
@@ -892,16 +906,17 @@ export default function StudentPortal() {
                   </button>
                 )}
               </div>
-              <p style={{
+              <div style={{
                 fontFamily: 'var(--body)',
-                fontSize: '16px',
-                fontWeight: 600,
+                fontSize: '15px',
+                fontWeight: 500,
                 color: 'var(--ink)',
-                lineHeight: '1.5',
-                margin: 0
+                lineHeight: '1.6',
+                margin: 0,
+                whiteSpace: 'pre-line'
               }}>
                 {aiQuestion || 'Connecting to viva engine...'}
-              </p>
+              </div>
             </div>
 
             {/* Spoken Answer Input Area */}
@@ -936,10 +951,10 @@ export default function StudentPortal() {
                   onClick={() => handleTurnSubmit(false, true)}
                   disabled={isSubmitting}
                   className="btn btn-secondary"
-                  style={{ fontSize: '11px', padding: '6px 12px' }}
+                  style={{ fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <HelpCircle size={13} color="var(--sun)" />
-                  Ask Socratic Hint
+                  <Sparkles size={13} color="var(--sun)" />
+                  <span>Progressive Hint (Level 1-4)</span>
                 </button>
 
                 <button

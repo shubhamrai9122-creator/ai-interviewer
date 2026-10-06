@@ -1,13 +1,19 @@
+import os
 import re
 import time
+import json
 import random
 from typing import Dict, Any, List, Optional, Tuple
+import requests
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
+
 from server.models import (
     VivaSession, QuestionAsked, StudentAnswer, Question, Topic,
     SessionPhase, SessionStatus, QuestionType, AnswerQuality,
     FollowupAction, IntegrityLog
 )
+from server.prompts import AI_TECHNICAL_INTERVIEWER_SYSTEM_PROMPT
 
 # Common prompt injection patterns
 INJECTION_PATTERNS = [
@@ -37,14 +43,74 @@ HINGLISH_TRANSLATION_MAP = {
     "aakhri element": "last element"
 }
 
+# Structured DSA Problems with explicit sections (Section 3 & 4)
+DSA_PROBLEMS = {
+    "two_sum": {
+        "id": "two_sum",
+        "title": "Two Sum",
+        "level": "Beginner",
+        "statement": "Given an array of integers nums and an integer target, return the indices of the two numbers such that they add up to target.",
+        "input_desc": "nums: List[int], target: int",
+        "output_desc": "List[int] containing the 0-based indices of the two elements.",
+        "constraints": "- 2 <= nums.length <= 10^4\n- -10^9 <= nums[i] <= 10^9\n- -10^9 <= target <= 10^9\n- Exactly one valid answer exists.\n- You may not use the same element twice.",
+        "examples": "Example 1:\nInput: nums = [2, 7, 11, 15], target = 9\nOutput: [0, 1] (Explanation: nums[0] + nums[1] == 9)\n\nExample 2:\nInput: nums = [3, 2, 4], target = 6\nOutput: [1, 2]",
+        "expected_concepts": ["hash map", "hash table", "complement", "O(N) time", "O(N) space", "two pointers"],
+        "hints": [
+            "Think about what information you need to look up for each number as you iterate through the array.",
+            "Consider whether a hash table or dictionary can help you look up the required complement (target - current_num) in average O(1) time.",
+            "As you traverse each element at index i, check if (target - nums[i]) is already stored in your hash map. If so, return [map[target - nums[i]], i]. If not, insert nums[i] -> i.",
+            "Initialize an empty map seen = {}. Loop index i, value n in nums: if (target - n) in seen, return [seen[target - n], i]. Otherwise set seen[n] = i."
+        ],
+        "follow_up_sorted": "What if the input array is already sorted in ascending order? How would you solve this without using extra memory (in O(1) auxiliary space)?"
+    },
+    "longest_substring": {
+        "id": "longest_substring",
+        "title": "Longest Substring Without Repeating Characters",
+        "level": "Intermediate",
+        "statement": "Given a string s, find the length of the longest substring without repeating characters.",
+        "input_desc": "s: str",
+        "output_desc": "int representing the length of the longest substring.",
+        "constraints": "- 0 <= s.length <= 5 * 10^4\n- s consists of English letters, digits, symbols and spaces.",
+        "examples": "Example 1:\nInput: s = \"abcabcbb\"\nOutput: 3 (Explanation: The answer is \"abc\", with length 3)\n\nExample 2:\nInput: s = \"bbbbb\"\nOutput: 1 (Explanation: The answer is \"b\", length 1)\n\nExample 3:\nInput: s = \"pwwkew\"\nOutput: 3 (Explanation: The answer is \"wke\", length 3)",
+        "expected_concepts": ["sliding window", "two pointers", "hash set", "hash map", "O(N) time", "frequency map"],
+        "hints": [
+            "Think about maintaining a contiguous window of characters as you scan through the string from left to right.",
+            "Can you use the Two Pointers or Sliding Window pattern with a hash set or dictionary to track characters in the current window?",
+            "Use two pointers, left and right. Expand right to include characters until you see a duplicate, then shrink left until the duplicate is expelled.",
+            "Store the last seen index of each character in a map seen = {}. When a duplicate char is seen at index right, advance left = max(left, seen[char] + 1) and record max_len = max(max_len, right - left + 1)."
+        ],
+        "follow_up_sorted": "How would you optimize this if the character set is strictly limited to 26 lowercase English letters or ASCII, rather than arbitrary Unicode?"
+    },
+    "subarray_sum": {
+        "id": "subarray_sum",
+        "title": "Subarray Sum Equals K",
+        "level": "Advanced",
+        "statement": "Given an array of integers nums and an integer k, return the total number of non-empty subarrays whose sum equals to k.",
+        "input_desc": "nums: List[int], k: int",
+        "output_desc": "int representing the count of continuous subarrays with sum k.",
+        "constraints": "- 1 <= nums.length <= 2 * 10^4\n- -1000 <= nums[i] <= 1000\n- -10^7 <= k <= 10^7",
+        "examples": "Example 1:\nInput: nums = [1, 1, 1], k = 2\nOutput: 2\n\nExample 2:\nInput: nums = [1, 2, 3], k = 3\nOutput: 2 (Subarrays: [1, 2] and [3])",
+        "expected_concepts": ["prefix sum", "hash map", "cumulative sum", "O(N) time", "O(N) space", "negative numbers"],
+        "hints": [
+            "Notice that the array can contain negative numbers, so a standard two-pointer sliding window cannot expand/contract monotonically.",
+            "Think about cumulative prefix sums: if prefix_sum[j] - prefix_sum[i] == k, what does that tell you about the subarray from i to j?",
+            "Store prefix sum frequencies in a hash map: prefix_counts = {0: 1}. At each element, update current_sum and add prefix_counts[current_sum - k] to total.",
+            "Initialize prefix_map = {0: 1}, count = 0, current_sum = 0. For n in nums: current_sum += n; count += prefix_map.get(current_sum - k, 0); prefix_map[current_sum] = prefix_map.get(current_sum, 0) + 1."
+        ],
+        "follow_up_sorted": "Why does a two-pointer sliding window fail when negative numbers are present, whereas it works when all numbers are strictly positive?"
+    }
+}
+
 class VivaEngine:
     def __init__(self, db: Session):
         self.db = db
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
 
     def calculate_phase(self, elapsed_sec: float, duration_minutes: int = 15, questions_asked_count: int = 0) -> SessionPhase:
         """Determines the viva phase based on configured duration or question count (unlimited)."""
         if duration_minutes <= 0:
-            # Unlimited / Open-ended mode: phase tracks progression across question tree
             if questions_asked_count <= 1:
                 return SessionPhase.WARMUP
             elif questions_asked_count <= 4:
@@ -94,23 +160,20 @@ class VivaEngine:
         is_hint_req: bool
     ) -> Tuple[AnswerQuality, FollowupAction, List[str], List[str]]:
         """
-        6-Stage Answer Classification:
-        Returns: (quality, followup_action, detected_concepts, missing_concepts)
+        Analyzes candidate's answer with Bloom/rubric extraction.
         """
         if is_silence:
             return AnswerQuality.NO_ANSWER, FollowupAction.MOVE_ON, [], []
 
-        if is_giveup or "i don't know" in raw_transcript.lower() or "no idea" in raw_transcript.lower() or "skip this" in raw_transcript.lower() or "move on" in raw_transcript.lower():
+        if is_giveup or any(phrase in raw_transcript.lower() for phrase in ["i don't know", "no idea", "skip this", "move on", "not sure"]):
             return AnswerQuality.NO_ANSWER, FollowupAction.MOVE_ON, [], []
 
-        if is_hint_req or "can you give me a hint" in raw_transcript.lower():
+        if is_hint_req or any(phrase in raw_transcript.lower() for phrase in ["can you give me a hint", "need a hint", "give a hint"]):
             return AnswerQuality.PARTIAL, FollowupAction.HINT, [], []
 
-        # Prompt injection attempt
         if self.detect_prompt_injection(raw_transcript):
             return AnswerQuality.OFF_TOPIC, FollowupAction.REDIRECT, [], []
 
-        # Concept extraction
         detected = []
         missing = []
         expected = question.expected_concepts if question and question.expected_concepts else []
@@ -118,7 +181,6 @@ class VivaEngine:
         normalized = self.normalize_hinglish(raw_transcript)
 
         for concept in expected:
-            # Check concept keyword presence
             c_low = concept.lower()
             if c_low in normalized or any(word in normalized for word in c_low.split() if len(word) > 3):
                 detected.append(concept)
@@ -128,23 +190,20 @@ class VivaEngine:
         words = normalized.split()
         total_words = len(words)
 
-        # Off-topic / Stalling detection
-        if total_words > 10 and len(detected) == 0 and not any(kw in normalized for kw in ["time", "data", "algorithm", "complexity", "structure", "function", "node", "tree", "array"]):
+        if total_words > 10 and len(detected) == 0 and not any(kw in normalized for kw in ["time", "data", "algorithm", "complexity", "structure", "function", "node", "tree", "array", "token", "react", "express", "hash", "pointer", "cookie", "sql"]):
             return AnswerQuality.OFF_TOPIC, FollowupAction.REDIRECT, detected, missing
 
-        # Quality scoring based on coverage and length
         if len(expected) > 0:
             coverage = len(detected) / len(expected)
-            if coverage >= 0.75 and total_words >= 15:
+            if coverage >= 0.65 and total_words >= 12:
                 return AnswerQuality.STRONG, FollowupAction.DEEPER, detected, missing
-            elif coverage >= 0.4:
+            elif coverage >= 0.35:
                 return AnswerQuality.CORRECT, FollowupAction.DEEPER, detected, missing
-            elif coverage > 0 or total_words >= 10:
+            elif coverage > 0 or total_words >= 8:
                 return AnswerQuality.PARTIAL, FollowupAction.HINT, detected, missing
             else:
                 return AnswerQuality.SHALLOW, FollowupAction.HINT, detected, missing
         else:
-            # Fallback if no expected concepts listed
             if total_words > 25:
                 return AnswerQuality.STRONG, FollowupAction.DEEPER, detected, missing
             elif total_words >= 10:
@@ -152,201 +211,370 @@ class VivaEngine:
             else:
                 return AnswerQuality.PARTIAL, FollowupAction.HINT, detected, missing
 
-    def select_next_question(
+    def _call_llm_interviewer(self, session: VivaSession, conversation_history: List[Dict[str, str]], latest_input: str, code_snippet: Optional[str] = None) -> Optional[str]:
+        """
+        Attempts to call Groq / OpenAI LLM using the Master Prompt.
+        Returns generated next question text or None on failure/missing keys.
+        """
+        profile = session.interview_profile or {}
+        hints_used = profile.get("hints_used", 0)
+
+        # Build message log
+        system_content = AI_TECHNICAL_INTERVIEWER_SYSTEM_PROMPT + f"""
+
+[CURRENT INTERVIEW CONTEXT]
+Candidate Name: {session.student_name}
+Target Domain: {session.preferred_domain or 'DSA & Web Development'}
+Target Level: {session.interview_level or 'Intermediate'}
+Elapsed Seconds: {session.elapsed_seconds}
+Hints Used So Far: {hints_used}
+
+REMINDERS:
+- Ask exactly ONE concise question at a time.
+- Do NOT dump multiple questions.
+- Do NOT reveal the answer.
+- Probe the quality of thinking.
+- If code was submitted, evaluate correctness, complexity, or edge cases.
+"""
+
+        messages = [{"role": "system", "content": system_content}]
+        for turn in conversation_history[-8:]:
+            messages.append({"role": turn.get("role", "user"), "content": turn.get("content", "")})
+
+        curr_msg = latest_input
+        if code_snippet:
+            curr_msg += f"\n[Candidate Code Submitted in Editor]:\n```{code_snippet}```"
+        messages.append({"role": "user", "content": curr_msg})
+
+        # Try Groq first (ultra-fast)
+        if self.groq_api_key:
+            try:
+                res = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self.groq_api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": messages,
+                        "temperature": 0.4,
+                        "max_tokens": 300
+                    },
+                    timeout=5
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    if content:
+                        return content
+            except Exception as e:
+                print(f"[VivaEngine] Groq LLM failed: {e}")
+
+        # Try OpenAI
+        if self.openai_api_key:
+            try:
+                res = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self.openai_api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": messages,
+                        "temperature": 0.4,
+                        "max_tokens": 300
+                    },
+                    timeout=6
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    if content:
+                        return content
+            except Exception as e:
+                print(f"[VivaEngine] OpenAI LLM failed: {e}")
+
+        return None
+
+    def _format_dsa_problem(self, problem: Dict[str, Any]) -> str:
+        """Formats problem strictly as required by Section 3."""
+        return (
+            f"Here is our DSA problem on {problem['title']}:\n\n"
+            f"**Problem Statement:**\n{problem['statement']}\n\n"
+            f"**Input Description:**\n{problem['input_desc']}\n\n"
+            f"**Output Description:**\n{problem['output_desc']}\n\n"
+            f"**Constraints:**\n{problem['constraints']}\n\n"
+            f"**Examples:**\n{problem['examples']}\n\n"
+            "Take a moment to review this. Before writing any code, please explain your understanding of the problem, any observations, and what approach you are considering."
+        )
+
+    def select_next_turn(
         self,
         session: VivaSession,
-        current_phase: SessionPhase,
-        last_quality: Optional[AnswerQuality],
-        last_action: Optional[FollowupAction],
-        missing_concepts: List[str]
-    ) -> Tuple[str, Optional[int], QuestionType]:
+        student_transcript: str,
+        code_snippet: Optional[str],
+        is_giveup: bool,
+        is_silence: bool,
+        is_hint_req: bool
+    ) -> Tuple[str, Optional[int], QuestionType, Dict[str, Any]]:
         """
-        Adaptive Topic Question Tree Traversal Engine:
-        - Starts at the Topic Root question
-        - Explores child branches (Correct/Strong vs Socratic Hint)
-        - Stops when branch hits terminal leaf, and smoothly transitions to next topic tree
+        Stateful, adaptive interviewer logic following all 19 guidelines.
         """
-        # 1. Warm-up & Step-by-Step Discovery Phase
+        profile = session.interview_profile or {}
         q_count = len(session.questions_asked)
-        if q_count == 0:
-            # Step 1: Introduction
+        lowered_input = student_transcript.lower()
+
+        # Update interview profile memory
+        stage = profile.get("stage", "INTRO")
+        preferred_domain = profile.get("preferred_domain", session.preferred_domain or "dsa")
+        level = profile.get("level", session.interview_level or "Intermediate")
+        hints_used = profile.get("hints_used", 0)
+        hint_level = profile.get("hint_level", 0)
+        characteristics = profile.get("characteristics", {
+            "asks_clarifying_questions": False,
+            "identifies_core_pattern": False,
+            "jumps_to_coding_early": False,
+            "explains_reasoning": False,
+            "derives_approach_independently": False,
+            "recognizes_brute_force": False,
+            "optimizes_own_solution": False,
+            "analyzes_time_complexity": False,
+            "analyzes_space_complexity": False,
+            "considers_edge_cases": False,
+            "debugs_own_code": False,
+            "responds_to_counterexamples": False,
+            "adapts_to_changed_constraints": False
+        })
+
+        # Observe candidate characteristics from current turn
+        if "?" in student_transcript or any(w in lowered_input for w in ["can the", "is it guaranteed", "are there duplicates", "what if"]):
+            characteristics["asks_clarifying_questions"] = True
+        if any(w in lowered_input for w in ["hash map", "hash table", "two pointer", "sliding window", "binary search", "prefix sum", "recursion", "dynamic programming"]):
+            characteristics["identifies_core_pattern"] = True
+        if any(w in lowered_input for w in ["because", "since", "reason", "approach", "the idea is"]):
+            characteristics["explains_reasoning"] = True
+        if any(w in lowered_input for w in ["o(n)", "o(1)", "o(log n)", "o(n^2)", "linear time", "constant time"]):
+            characteristics["analyzes_time_complexity"] = True
+        if any(w in lowered_input for w in ["o(n) space", "o(1) space", "extra memory", "auxiliary space"]):
+            characteristics["analyzes_space_complexity"] = True
+        if any(w in lowered_input for w in ["brute force", "nested loop", "check every pair"]):
+            characteristics["recognizes_brute_force"] = True
+        if any(w in lowered_input for w in ["optimize", "better way", "instead of nested", "hash map instead"]):
+            characteristics["optimizes_own_solution"] = True
+        if any(w in lowered_input for w in ["empty", "null", "single element", "negative", "duplicates", "edge case"]):
+            characteristics["considers_edge_cases"] = True
+
+        # Pick chosen DSA problem based on level
+        prob_key = "two_sum" if level.lower() == "beginner" else ("subarray_sum" if level.lower() == "advanced" else "longest_substring")
+        problem = DSA_PROBLEMS.get(prob_key, DSA_PROBLEMS["longest_substring"])
+
+        # Handle Prompt Injection (Section 12 / Integrity)
+        if self.detect_prompt_injection(student_transcript):
             return (
-                f"Hello {session.student_name}! Welcome to your technical viva examination. To get started warmly, please introduce yourself briefly and share a project or area of technology you have recently worked with.",
+                "Let's stay focused on our technical interview. Could you explain the time and space complexity of the approach you were discussing?",
                 None,
-                QuestionType.PROJECT
-            )
-        elif q_count == 1:
-            # Step 2: Ask candidate which topic they feel strongest in
-            is_web = "web" in (session.subject_domain or "").lower()
-            topic_options = "React Architecture, Node.js Event Loop, or Databases & Storage" if is_web else "Arrays & Hashing, Trees & BSTs, Graph Algorithms, or Dynamic Programming"
-            return (
-                f"Thank you for sharing your background! Before we jump into technical problems, which topic do you feel strongest in? (For example: {topic_options}). I'll start with your forte!",
-                None,
-                QuestionType.CONCEPT
-            )
-        elif q_count == 2:
-            # Step 3: Prioritize candidate's chosen strong topic
-            last_ans = session.student_answers[-1].transcript.lower() if session.student_answers else ""
-            topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).all()
-            matched_topic = None
-
-            # Detect chosen topic from transcript
-            for t in topics:
-                t_words = t.name.lower().split()
-                if any(w in last_ans for w in t_words if len(w) > 3) or t.name.lower() in last_ans:
-                    matched_topic = t
-                    break
-                # Special abbreviations
-                if "dp" in last_ans and "dynamic" in t.name.lower():
-                    matched_topic = t
-                    break
-                if ("react" in last_ans or "dom" in last_ans) and "frontend" in t.name.lower():
-                    matched_topic = t
-                    break
-                if ("node" in last_ans or "api" in last_ans) and "backend" in t.name.lower():
-                    matched_topic = t
-                    break
-
-            if not matched_topic and topics:
-                matched_topic = topics[0]
-
-            if matched_topic:
-                session.current_topic_id = matched_topic.id
-                root_q = self.db.query(Question).filter(
-                    Question.topic_id == matched_topic.id,
-                    Question.tree_depth == 1,
-                    ~Question.id.in_(asked_ids)
-                ).first()
-                if root_q:
-                    return (
-                        f"Great! Let's start with your strong topic: {matched_topic.name}. Here is your first question: {root_q.question_text}",
-                        root_q.id,
-                        root_q.question_type
-                    )
-
-        # 2. Wrap-up Phase
-        if current_phase == SessionPhase.WRAPUP:
-            return (
-                "You've done wonderfully tackling these questions! We have covered all our main technical areas today. Is there any final clarification, detail, or insight you would like to share before we conclude?",
-                None,
-                QuestionType.CONCEPT
+                QuestionType.CONCEPT,
+                profile
             )
 
-        if current_phase in [SessionPhase.SCORING, SessionPhase.COMPLETED]:
+        # Handle Progressive Hints (Section 6)
+        if is_hint_req or ("hint" in lowered_input and len(student_transcript.split()) < 10):
+            hint_level = min(4, hint_level + 1)
+            hints_used += 1
+            profile["hints_used"] = hints_used
+            profile["hint_level"] = hint_level
+            hint_text = problem["hints"][hint_level - 1]
             return (
-                "Our viva examination has now concluded! All your spoken explanations and code have been saved for faculty review. Your evaluation report is being generated right now. Thank you so much for your effort!",
+                f"[Hint Level {hint_level}]: {hint_text}\n\nHow does this guide your line of thinking?",
                 None,
-                QuestionType.CONCEPT
+                QuestionType.WHY,
+                profile
             )
 
-        # Get all asked question IDs in this session
-        asked_ids = [qa.question_id for qa in session.questions_asked if qa.question_id is not None]
-        last_qa = session.questions_asked[-1] if session.questions_asked else None
-        last_q_id = last_qa.question_id if last_qa else None
-
-        # 3. Handle Hint / Missing Concept Follow-up
-        if last_action == FollowupAction.HINT and missing_concepts:
-            target_concept = missing_concepts[0]
-            # Check if there is an explicit hint branch question in the tree
-            if last_q_id:
-                hint_child = self.db.query(Question).filter(
-                    Question.parent_question_id == last_q_id,
-                    Question.branch_condition == "PARTIAL",
-                    ~Question.id.in_(asked_ids)
-                ).first()
-                if hint_child:
-                    return (hint_child.question_text, hint_child.id, hint_child.question_type)
-
-            return (
-                f"You're very close! Think a little more about {target_concept}. How would that play a role here? Take your time.",
-                None,
-                QuestionType.WHY
-            )
-
-        if last_action == FollowupAction.REDIRECT:
-            return (
-                "Let's refocus gently on our core technical objective. In the context of this data structure, how does your implementation handle scale and edge cases?",
-                None,
-                QuestionType.WHY
-            )
-
-        if last_action == FollowupAction.MOVE_ON:
-            # Move on gracefully to the next topic or unasked question
-            topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).order_by(Topic.id.asc()).all()
-            for t in topics:
-                root_q = self.db.query(Question).filter(
-                    Question.topic_id == t.id,
-                    Question.tree_depth == 1,
-                    ~Question.id.in_(asked_ids)
-                ).first()
-                if root_q:
-                    session.current_topic_id = t.id
-                    return (
-                        f"No worries at all! Let's move on to our next question on {t.name}: {root_q.question_text}",
-                        root_q.id,
-                        root_q.question_type
-                    )
-
-            # Check unasked approved questions
-            rem_q = self.db.query(Question).filter(
-                Question.viva_id == session.viva_id,
-                Question.status == "APPROVED",
-                ~Question.id.in_(asked_ids)
-            ).first()
-            if rem_q:
+        # Handle 'I don't know' or giving up (Section 2, 6, 10)
+        if is_giveup or "i don't know" in lowered_input or "no idea" in lowered_input:
+            if hint_level < 2:
+                hint_level = 1
+                hints_used += 1
+                profile["hints_used"] = hints_used
+                profile["hint_level"] = hint_level
                 return (
-                    f"No problem! Let's move forward to this question: {rem_q.question_text}",
-                    rem_q.id,
-                    rem_q.question_type
+                    f"That's completely fine. Let's break it down together with a small direction: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?",
+                    None,
+                    QuestionType.CONCEPT,
+                    profile
+                )
+            else:
+                # Transition smoothly
+                stage = "WEB_DEV_1"
+                profile["stage"] = stage
+                return (
+                    "No problem at all! Let's switch gears and explore Web Development systems. Suppose you have a React frontend and Express backend. Explain how you would implement authentication using JWT. Where would you store the token, how would the server verify it, and what security concerns would you consider?",
+                    None,
+                    QuestionType.APPLIED,
+                    profile
                 )
 
-        # 4. Tree Traversal: Check if last question has child branch nodes in the tree
-        if last_q_id and last_action != FollowupAction.MOVE_ON:
-            last_q = self.db.query(Question).filter(Question.id == last_q_id).first()
-            if last_q and not last_q.is_terminal:
-                branch_filter = ["STRONG", "CORRECT"] if last_quality == AnswerQuality.STRONG else ["CORRECT", "STRONG"]
-                child_q = self.db.query(Question).filter(
-                    Question.parent_question_id == last_q_id,
-                    Question.branch_condition.in_(branch_filter),
-                    ~Question.id.in_(asked_ids)
-                ).order_by(Question.tree_depth.asc()).first()
+        # STAGE 0: Introduction & Background Discovery (Section 19)
+        if q_count == 0 or stage == "INTRO":
+            # Extract preferred domain and level from candidate's answer
+            if "web" in lowered_input:
+                preferred_domain = "webdev"
+            elif "dsa" in lowered_input or "data structure" in lowered_input or "algorithm" in lowered_input:
+                preferred_domain = "dsa"
+            
+            if "beginner" in lowered_input:
+                level = "Beginner"
+            elif "advanced" in lowered_input:
+                level = "Advanced"
+            elif "intermediate" in lowered_input:
+                level = "Intermediate"
 
-                if child_q:
-                    prefix = "That was a wonderfully clear explanation! Let's branch deeper into this topic: " if last_quality == AnswerQuality.STRONG else "Good. Following up on this branch: "
-                    return (f"{prefix}{child_q.question_text}", child_q.id, child_q.question_type)
+            profile["preferred_domain"] = preferred_domain
+            profile["level"] = level
+            profile["stage"] = "WARMUP"
+            session.preferred_domain = preferred_domain
+            session.interview_level = level
 
-        # 5. If branch ended (terminal leaf reached) or no child: Transition to NEXT Topic Tree!
-        topics = self.db.query(Topic).filter(Topic.viva_id == session.viva_id).order_by(Topic.id.asc()).all()
-        for t in topics:
-            root_q = self.db.query(Question).filter(
-                Question.topic_id == t.id,
-                Question.tree_depth == 1,
-                ~Question.id.in_(asked_ids)
-            ).first()
+            # Warm-up question (Section 16)
+            if preferred_domain == "webdev":
+                warmup_q = "Thank you for the introduction! Let's start with a foundational web question: How does the browser Event Loop coordinate the execution of synchronous code, microtasks (like Promises), and macrotasks (like setTimeout)?"
+            else:
+                warmup_q = "Thank you for the introduction! Let's warm up with a foundational question: What are the differences between an Array and a Linked List in memory allocation, and how do their insertion and lookup complexities compare?"
+            
+            return (warmup_q, None, QuestionType.CONCEPT, profile)
 
-            if root_q:
-                session.current_topic_id = t.id
+        # STAGE 1: Transition from Warmup to DSA Assessment (Section 3, 4, 16)
+        if stage == "WARMUP":
+            profile["stage"] = "DSA_PRESENTED"
+            profile["dsa_problem_id"] = prob_key
+            problem_text = self._format_dsa_problem(problem)
+            return (problem_text, None, QuestionType.CONCEPT, profile)
+
+        # STAGE 2: Candidate Explains Understanding / Approach (Section 3, 5, 7)
+        if stage == "DSA_PRESENTED":
+            # Check if candidate jumped straight to code without explaining (Section 3 & 7)
+            if code_snippet and len(student_transcript.split()) < 10:
+                characteristics["jumps_to_coding_early"] = True
+                profile["stage"] = "DSA_APPROACH_REASONING"
                 return (
-                    f"Great job! That successfully completes our exploration of that topic tree. Let's now branch into our next topic: {t.name}. {root_q.question_text}",
-                    root_q.id,
-                    root_q.question_type
+                    "I notice you jumped straight into writing code. In a technical interview, it's very important to communicate first. Before we inspect the code, could you explain your observations, what data structure you selected, and why you believe it is the optimal approach?",
+                    None,
+                    QuestionType.WHY,
+                    profile
                 )
 
-        # 6. If all trees exhausted, check any remaining unasked approved questions
-        remaining_q = self.db.query(Question).filter(
-            Question.viva_id == session.viva_id,
-            Question.status == "APPROVED",
-            ~Question.id.in_(asked_ids)
-        ).first()
+            # Analyze approach: is it brute force or optimal?
+            if any(w in lowered_input for w in ["brute force", "check all", "nested loop", "two loops"]):
+                profile["stage"] = "DSA_OPTIMIZATION"
+                return (
+                    "Good, that brute force approach gives us a correct baseline. What would be the time and space complexity of that nested-loop approach, and can we optimize it to avoid redundant lookups?",
+                    None,
+                    QuestionType.TRADE_OFF,
+                    profile
+                )
 
-        if remaining_q:
-            return (remaining_q.question_text, remaining_q.id, remaining_q.question_type)
+            # Candidate proposed optimal or reasoned approach
+            profile["stage"] = "DSA_CODING"
+            return (
+                "That is a very sound approach! What are the expected time and space complexities for this strategy, and are there any edge cases you'll need to handle once you implement it? Please also feel free to start writing your implementation in the code editor on the right.",
+                None,
+                QuestionType.TRADE_OFF,
+                profile
+            )
 
-        # All question trees completed!
+        # STAGE 3: DSA Optimization probing (Section 5 Stage 4 & 5)
+        if stage == "DSA_OPTIMIZATION":
+            profile["stage"] = "DSA_CODING"
+            return (
+                "Spot on! With that optimization in mind, what is your improved time complexity? Go ahead and write out your implementation in the code editor on the right screen.",
+                None,
+                QuestionType.CONCEPT,
+                profile
+            )
+
+        # STAGE 4: Candidate Implementing Code / Reviewing Implementation (Section 5 Stage 6 & Section 13)
+        if stage == "DSA_CODING":
+            profile["stage"] = "DSA_CODE_REVIEW"
+            if code_snippet and len(code_snippet.strip()) > 20:
+                # Code evaluation (Section 13)
+                # Check for edge cases
+                return (
+                    "Thank you for writing that out! Looking closely at your implementation, how does your code handle edge cases, such as an empty input, an array with duplicate values, or inputs where no pair exists?",
+                    None,
+                    QuestionType.EDGE_CASE,
+                    profile
+                )
+            else:
+                return (
+                    "Please walk me through your code line by line. What is the role of each variable you defined, and how do you ensure the loop terminates correctly?",
+                    None,
+                    QuestionType.WHY,
+                    profile
+                )
+
+        # STAGE 5: DSA Follow-up / Changed Constraint (Section 5 Stage 8, Section 7)
+        if stage == "DSA_CODE_REVIEW":
+            profile["stage"] = "WEB_DEV_1"
+            followup_prompt = problem.get("follow_up_sorted", "What if the input size is scaled to 10^7 elements and memory is strictly limited? How would you modify your approach?")
+            return (
+                f"Well explained! Here is an optimization follow-up: {followup_prompt}",
+                None,
+                QuestionType.TRADE_OFF,
+                profile
+            )
+
+        # STAGE 6: Web Development Assessment (Section 8 & 9)
+        if stage == "WEB_DEV_1":
+            profile["stage"] = "WEB_DEV_FOLLOWUP_1"
+            # Section 9 scenario question
+            return (
+                "That wraps up our algorithmic discussion nicely! Let's now transition to Web Development systems:\n\n"
+                "Suppose you have a React frontend and Express backend. Explain how you would implement authentication using JWT. Where would you store the token, how would the server verify it, and what security concerns would you consider?",
+                None,
+                QuestionType.APPLIED,
+                profile
+            )
+
+        # STAGE 7: Web Development Follow-up 1 (Section 9 & 11)
+        if stage == "WEB_DEV_FOLLOWUP_1":
+            profile["stage"] = "WEB_DEV_FOLLOWUP_2"
+            # Follow-up referencing their choice
+            if "localstorage" in lowered_input:
+                return (
+                    "You mentioned storing the JWT in localStorage. Why choose that over an httpOnly cookie, and what makes localStorage susceptible to XSS (Cross-Site Scripting) attacks? How would you protect against that?",
+                    None,
+                    QuestionType.WHY,
+                    profile
+                )
+            elif "cookie" in lowered_input or "httponly" in lowered_input:
+                return (
+                    "You chose httpOnly cookies, which is great for mitigating XSS. However, does storing cookies expose your API to CSRF (Cross-Site Request Forgery), and what headers or SameSite attributes would you configure to prevent that?",
+                    None,
+                    QuestionType.TRADE_OFF,
+                    profile
+                )
+            else:
+                return (
+                    "Following up on your authentication flow: What happens when the access token expires while the user is actively working? How would you implement a refresh token mechanism without disrupting the user experience?",
+                    None,
+                    QuestionType.WHY,
+                    profile
+                )
+
+        # STAGE 8: Web Development Follow-up 2 (Token Revocation & Route Protection) (Section 9)
+        if stage == "WEB_DEV_FOLLOWUP_2":
+            profile["stage"] = "WRAPUP"
+            return (
+                "Since standard JWTs are stateless, what happens if a user clicks 'Logout' or a token is stolen? How would the server revoke an active JWT before its expiration timestamp? Also, how would you structure an Express middleware to protect private API routes?",
+                None,
+                QuestionType.TRADE_OFF,
+                profile
+            )
+
+        # STAGE 9: Wrap-up & Final Conclusion (Section 16)
+        profile["stage"] = "COMPLETED"
         return (
-            "You have covered all the topic question trees prepared for this examination! Is there any final technical clarification or insight you'd like to share before we conclude?",
+            "We have covered all primary DSA and Web Development competencies for this interview! You did a very thorough job reasoning through the algorithmic stages and web architectures. Is there any final clarification or insight you would like to share before we conclude and evaluate?",
             None,
-            QuestionType.CONCEPT
+            QuestionType.CONCEPT,
+            profile
         )
 
     def process_turn(
@@ -366,25 +594,24 @@ class VivaEngine:
     ) -> Dict[str, Any]:
         """
         Executes an end-to-end viva conversational turn with latency profiling,
-        recording acoustic telemetry, code submissions, and audio clips.
+        recording acoustic telemetry, code submissions, and memory state.
         """
         start_time = time.time()
         session = self.db.query(VivaSession).filter(VivaSession.id == session_id).first()
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # Update session elapsed time and calculate phase
         duration_mins = session.duration_minutes if session.duration_minutes is not None else 15
         questions_count = len(session.questions_asked)
         new_phase = self.calculate_phase(elapsed_seconds, duration_minutes=duration_mins, questions_asked_count=questions_count)
         session.current_phase = new_phase
+        session.elapsed_seconds = elapsed_seconds
 
-        # Combine student transcript and code for analysis if code was submitted
         combined_text = student_transcript
         if code_snippet and code_snippet.strip():
-            combined_text += f"\n[Code Implementation]: {code_snippet}"
+            combined_text += f"\n[Code Implementation]:\n{code_snippet}"
 
-        # Check prompt injection
+        # Prompt injection logging
         if self.detect_prompt_injection(combined_text):
             integ = IntegrityLog(
                 session_id=session.id,
@@ -396,7 +623,6 @@ class VivaEngine:
             session.flagged_for_review = True
             session.flag_reason = "Prompt injection attempt detected during viva."
 
-        # Fetch last question asked to evaluate the answer against
         last_question_asked = self.db.query(QuestionAsked).filter(
             QuestionAsked.session_id == session.id
         ).order_by(QuestionAsked.id.desc()).first()
@@ -405,7 +631,6 @@ class VivaEngine:
         if last_question_asked and last_question_asked.question_id:
             last_bank_q = self.db.query(Question).filter(Question.id == last_question_asked.question_id).first()
 
-        # Analyze student answer
         quality, action, detected, missing = self.analyze_answer(
             question=last_bank_q,
             raw_transcript=combined_text,
@@ -414,7 +639,6 @@ class VivaEngine:
             is_hint_req=is_hint_req
         )
 
-        # Record answer if there was a preceding question asked
         if last_question_asked:
             answer = StudentAnswer(
                 session_id=session.id,
@@ -435,14 +659,39 @@ class VivaEngine:
             )
             self.db.add(answer)
 
-        # Select next question
-        next_text, next_qid, next_qtype = self.select_next_question(
-            session=session,
-            current_phase=new_phase,
-            last_quality=quality,
-            last_action=action,
-            missing_concepts=missing
-        )
+        # Build chat history for LLM
+        history = []
+        for qa in session.questions_asked:
+            history.append({"role": "assistant", "content": qa.question_text})
+            matching_ans = next((a for a in session.answers if a.question_asked_id == qa.id), None)
+            if matching_ans:
+                history.append({"role": "user", "content": matching_ans.transcript})
+
+        # Try LLM first if configured
+        next_text = None
+        next_qid = None
+        next_qtype = QuestionType.CONCEPT
+
+        if (self.groq_api_key or self.openai_api_key) and not is_silence and not is_giveup:
+            llm_text = self._call_llm_interviewer(session, history, student_transcript, code_snippet)
+            if llm_text:
+                next_text = llm_text
+
+        # Fallback to local adaptive interviewer engine
+        if not next_text:
+            local_text, local_qid, local_qtype, updated_profile = self.select_next_turn(
+                session=session,
+                student_transcript=student_transcript,
+                code_snippet=code_snippet,
+                is_giveup=is_giveup,
+                is_silence=is_silence,
+                is_hint_req=is_hint_req
+            )
+            next_text = local_text
+            next_qid = local_qid
+            next_qtype = local_qtype
+            session.interview_profile = dict(updated_profile)
+            flag_modified(session, "interview_profile")
 
         # Record new question asked
         new_qa = QuestionAsked(
@@ -458,9 +707,10 @@ class VivaEngine:
         self.db.commit()
 
         latency_ms = round((time.time() - start_time) * 1000, 1)
-
         total_sec = duration_mins * 60 if duration_mins > 0 else 0
         rem_sec = max(0, total_sec - elapsed_seconds) if duration_mins > 0 else 0
+
+        is_completed = (new_phase in [SessionPhase.SCORING, SessionPhase.COMPLETED]) or (session.interview_profile and session.interview_profile.get("stage") == "COMPLETED")
 
         return {
             "session_id": session.id,
@@ -475,5 +725,6 @@ class VivaEngine:
             "detected_concepts": detected,
             "missing_concepts": missing,
             "latency_ms": latency_ms,
-            "is_viva_completed": (new_phase in [SessionPhase.SCORING, SessionPhase.COMPLETED])
+            "hints_used": session.interview_profile.get("hints_used", 0) if session.interview_profile else 0,
+            "is_viva_completed": is_completed
         }
