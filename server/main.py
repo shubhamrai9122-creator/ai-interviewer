@@ -18,13 +18,14 @@ from server.models import (
     ContextQuestionGenRequest, VoiceAcousticsRequest,
     VivaDurationUpdateRequest, QuestionTreeNodeCreate,
     ProjectIngestRequest, ProjectVerdictRequest,
-    SyllabusTreeUploadRequest
+    SyllabusTreeUploadRequest, CodeExecutionRequest
 )
 from server.viva_engine import VivaEngine
 from server.scoring_worker import ScoringWorker
 from server.seed_data import seed_database
 from server.load_test_suite import run_scalability_simulation
 from server.voice_service import voice_service, EXAMINER_PERSONAS, AUDIO_DIR
+from server.code_executor import run_code_sandbox
 
 # Database setup (SQLite file for persistence)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "viva.db")
@@ -992,3 +993,17 @@ def export_csv(db: Session = Depends(get_db)):
 def get_load_test_results():
     """Returns load testing results proving 50, 100, and 150 concurrent sessions."""
     return run_scalability_simulation()
+
+# --- LeetCode Code Execution Sandbox Endpoint ---
+@app.post("/api/code/run")
+def execute_code(req: CodeExecutionRequest):
+    """
+    Executes candidate code in an isolated sandbox with real-time test case assertions,
+    runtime latency, memory metrics, and stdout/stderr capture (LeetCode format).
+    """
+    return run_code_sandbox(
+        code=req.code,
+        language=req.language,
+        test_cases=req.test_cases,
+        custom_input=req.custom_input
+    )

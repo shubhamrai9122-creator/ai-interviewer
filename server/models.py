@@ -327,3 +327,9 @@ class SyllabusTreeUploadRequest(BaseModel):
     duration_minutes: int = 15
     syllabus_text: str
 
+class CodeExecutionRequest(BaseModel):
+    code: str
+    language: str = "javascript" # javascript, python, cpp, java
+    custom_input: Optional[str] = None
+    test_cases: Optional[List[dict]] = Field(default_factory=list)
+
