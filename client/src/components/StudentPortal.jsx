@@ -787,15 +787,29 @@ export default function StudentPortal() {
       )}
 
       {/* =====================================================================
-          HACKERRANK SPLIT VIEW: LEFT (QUESTION & SPEECH) | RIGHT (CODE ARENA)
+          LEETCODE WORKSPACE SPLIT VIEW:
+          LEFT: FULL CODE EDITOR PLATFORM (COVERING ENTIRE LEFT SCREEN)
+          RIGHT: EXAMINER QUESTION PROBE, VOICE CATCHING, PROCTORS & TRANSCRIPT
           ===================================================================== */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(420px, 45%) minmax(500px, 55%)',
+        gridTemplateColumns: 'minmax(600px, 58%) minmax(380px, 42%)',
         gap: '20px',
         alignItems: 'start'
       }}>
-        {/* LEFT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
+        {/* LEFT COLUMN: FULL LEETCODE / HACKERRANK CODE WRITING PLATFORM */}
+        <div style={{ position: 'sticky', top: '80px', height: 'calc(100vh - 120px)', minHeight: '680px' }}>
+          <HackerRankCodeEditor
+            subject={selectedDomain}
+            code={codeContent}
+            onChange={setCodeContent}
+            onSubmitSolution={(codeToSubmit) => {
+              handleTurnSubmit(false, false, codeToSubmit);
+            }}
+          />
+        </div>
+
+        {/* RIGHT COLUMN: Question Probe, Voice Catching, Proctors & Transcript */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* Question Card */}
           <div className="glass-panel" style={{ padding: '24px', background: '#FFFFFF' }}>
@@ -991,18 +1005,6 @@ export default function StudentPortal() {
               })}
             </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: FULL HACKERRANK-STYLE CODE WRITING PANEL */}
-        <div style={{ position: 'sticky', top: '90px' }}>
-          <HackerRankCodeEditor
-            subject={selectedDomain}
-            code={codeContent}
-            onChange={setCodeContent}
-            onSubmitSolution={(codeToSubmit) => {
-              handleTurnSubmit(false, false, codeToSubmit);
-            }}
-          />
         </div>
       </div>
 

@@ -237,17 +237,19 @@ export default function HackerRankCodeEditor({
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
   const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
 
   const testCases = subject === 'webdev' ? DEFAULT_WEB_TEST_CASES : DEFAULT_DSA_TEST_CASES;
 
-  // Initialize with starter code if empty
+  // Initialize with starter code if empty or on subject change
   useEffect(() => {
-    if (!code) {
+    if (!code || code.trim() === '') {
       const template = STARTER_CODES[language]?.[subject] || STARTER_CODES.javascript.dsa;
       onChange(template);
     }
-  }, [language, subject]);
+  }, [language, subject, code]);
 
   const handleLanguageChange = (newLang) => {
     setLanguage(newLang);
@@ -321,14 +323,20 @@ export default function HackerRankCodeEditor({
   const lines = (code || '').split('\n');
   const activeTestCase = testCases[selectedTestCaseIndex] || testCases[0];
 
+  const handleScroll = (e) => {
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = e.target.scrollTop;
+    }
+  };
+
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      minHeight: '740px',
+      width: '100%',
       background: '#1A1A1A',
-      borderRadius: '10px',
+      borderRadius: '12px',
       border: '1px solid #2D2D2D',
       overflow: 'hidden',
       boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
@@ -489,28 +497,31 @@ export default function HackerRankCodeEditor({
         </div>
       </div>
 
-      {/* 2. LeetCode Editor Body (Line Numbers + Dark Code Canvas) */}
+      {/* 2. LeetCode Editor Body (Line Numbers + Dark Code Canvas Covering Left Screen) */}
       <div style={{
         flex: 1,
         display: 'flex',
         position: 'relative',
-        minHeight: '380px',
         background: '#1E1E1E',
         overflow: 'hidden'
       }}>
         {/* Line Numbers Gutter */}
-        <div style={{
-          width: '44px',
-          padding: '14px 6px 14px 0',
-          background: '#1E1E1E',
-          borderRight: '1px solid #2B2B2B',
-          textAlign: 'right',
-          userSelect: 'none',
-          fontFamily: 'var(--mono)',
-          fontSize: '12px',
-          lineHeight: '1.6',
-          color: '#5A5A5A'
-        }}>
+        <div
+          ref={gutterRef}
+          style={{
+            width: '46px',
+            padding: '14px 6px 14px 0',
+            background: '#1E1E1E',
+            borderRight: '1px solid #2B2B2B',
+            textAlign: 'right',
+            userSelect: 'none',
+            fontFamily: 'var(--mono)',
+            fontSize: '12px',
+            lineHeight: '1.6',
+            color: '#5A5A5A',
+            overflowY: 'hidden'
+          }}
+        >
           {lines.map((_, i) => (
             <div key={i}>{i + 1}</div>
           ))}
@@ -522,6 +533,7 @@ export default function HackerRankCodeEditor({
           value={code}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onScroll={handleScroll}
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
@@ -540,42 +552,49 @@ export default function HackerRankCodeEditor({
             whiteSpace: 'pre',
             overflowWrap: 'normal',
             overflowX: 'auto',
+            overflowY: 'auto',
             tabSize: 4
           }}
         />
       </div>
 
-      {/* 3. LeetCode Bottom Testcase & Test Result Panel */}
+      {/* 3. LeetCode Bottom Testcase & Test Result Panel with Collapsible Drawer */}
       <div style={{
         background: '#262626',
         borderTop: '1px solid #333333',
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: '320px'
+        maxHeight: isDrawerCollapsed ? '38px' : '280px',
+        transition: 'max-height 0.2s ease',
+        overflow: 'hidden'
       }}>
-        {/* Tab Headers: Testcase vs Test Result */}
+        {/* Tab Headers: Testcase vs Test Result + Collapse Chevron */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 12px',
           background: '#1F1F1F',
-          borderBottom: '1px solid #2D2D2D',
-          height: '36px'
+          borderBottom: isDrawerCollapsed ? 'none' : '1px solid #2D2D2D',
+          height: '38px',
+          minHeight: '38px'
         }}>
           <div style={{ display: 'flex', gap: '4px', height: '100%' }}>
             <button
               type="button"
-              onClick={() => setActiveBottomTab('testcase')}
+              onClick={() => {
+                setActiveBottomTab('testcase');
+                setIsDrawerCollapsed(false);
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '0 12px',
                 background: 'transparent',
-                color: activeBottomTab === 'testcase' ? '#FFFFFF' : '#888888',
+                color: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? '#FFFFFF' : '#888888',
                 border: 'none',
-                borderBottom: activeBottomTab === 'testcase' ? '2px solid #FFA116' : '2px solid transparent',
+                borderBottom: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? '2px solid #FFA116' : '2px solid transparent',
                 fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer'
@@ -586,16 +605,19 @@ export default function HackerRankCodeEditor({
 
             <button
               type="button"
-              onClick={() => setActiveBottomTab('result')}
+              onClick={() => {
+                setActiveBottomTab('result');
+                setIsDrawerCollapsed(false);
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '0 12px',
                 background: 'transparent',
-                color: activeBottomTab === 'result' ? '#FFFFFF' : '#888888',
+                color: (!isDrawerCollapsed && activeBottomTab === 'result') ? '#FFFFFF' : '#888888',
                 border: 'none',
-                borderBottom: activeBottomTab === 'result' ? '2px solid #FFA116' : '2px solid transparent',
+                borderBottom: (!isDrawerCollapsed && activeBottomTab === 'result') ? '2px solid #FFA116' : '2px solid transparent',
                 fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer'
@@ -613,26 +635,49 @@ export default function HackerRankCodeEditor({
             </button>
           </div>
 
-          {/* Quick status pill when result is available */}
-          {runResult && activeBottomTab === 'result' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Quick status pill when result is available */}
+            {runResult && !isDrawerCollapsed && activeBottomTab === 'result' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: runResult.status === 'Accepted' ? '#22C55E' : '#EF4444',
+                  fontFamily: 'var(--mono)'
+                }}>
+                  {runResult.status}
+                </span>
+                <span style={{ fontSize: '11px', color: '#888888', fontFamily: 'var(--mono)' }}>
+                  {runResult.runtime_ms} ms
+                </span>
+              </div>
+            )}
+
+            {/* Collapse/Expand Drawer Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsDrawerCollapsed(!isDrawerCollapsed)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#A0A0A0',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
                 fontSize: '11px',
-                fontWeight: 700,
-                color: runResult.status === 'Accepted' ? '#22C55E' : '#EF4444',
-                fontFamily: 'var(--mono)'
-              }}>
-                {runResult.status}
-              </span>
-              <span style={{ fontSize: '11px', color: '#888888', fontFamily: 'var(--mono)' }}>
-                Runtime: {runResult.runtime_ms} ms
-              </span>
-            </div>
-          )}
+                padding: '4px 6px'
+              }}
+              title={isDrawerCollapsed ? "Expand Testcase Panel" : "Collapse Testcase Panel to enlarge code"}
+            >
+              <span>{isDrawerCollapsed ? 'Expand Testcases' : 'Collapse'}</span>
+              {isDrawerCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
         </div>
 
         {/* Tab 1: Testcase Panel (Case 1, Case 2, Case 3 pills like LeetCode) */}
-        {activeBottomTab === 'testcase' && (
+        {!isDrawerCollapsed && activeBottomTab === 'testcase' && (
           <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
             {/* Case selector pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
@@ -743,7 +788,7 @@ export default function HackerRankCodeEditor({
         )}
 
         {/* Tab 2: LeetCode Test Result Panel */}
-        {activeBottomTab === 'result' && (
+        {!isDrawerCollapsed && activeBottomTab === 'result' && (
           <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
             {runResult ? (
               <div>
