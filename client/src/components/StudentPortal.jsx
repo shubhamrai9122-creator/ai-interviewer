@@ -71,6 +71,9 @@ export default function StudentPortal() {
   // References
   const audioEngineRef = useRef(null);
   const recognitionRef = useRef(null);
+  const lastNudgeTimeRef = useRef(0);
+  const isAiSpeakingRef = useRef(false);
+  const aiQuestionRef = useRef('');
 
   // Helper to select sweet, young female voice in browser
   const getSweetFemaleVoice = () => {
@@ -94,31 +97,66 @@ export default function StudentPortal() {
     return voices.find(v => v.lang.startsWith('en')) || voices[0];
   };
 
-  // Pre-load speech voices
+  // Pre-load speech voices and initialize audio context on user interaction
   useEffect(() => {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
+      const loadVoices = () => {
         window.speechSynthesis.getVoices();
       };
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
 
-  // Text-To-Speech with Sweet Young Voice
+  // Text-To-Speech with Sweet Young English Voice & browser unlock
   const speakText = (text) => {
-    if ('speechSynthesis' in window) {
+    if (!text || !('speechSynthesis' in window)) return;
+
+    try {
+      // Force cancel any stuck utterance and resume audio thread
       window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
       const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US'; // AI exclusively speaks in English
       const v = getSweetFemaleVoice();
       if (v) utterance.voice = v;
 
-      utterance.rate = 0.98;
-      utterance.pitch = 1.22; // Sweet melodious young tone
+      utterance.rate = 1.0;
+      utterance.pitch = 1.25; // Sweet melodious young tone
 
-      utterance.onstart = () => setIsAiSpeaking(true);
-      utterance.onend = () => setIsAiSpeaking(false);
-      utterance.onerror = () => setIsAiSpeaking(false);
+      utterance.onstart = () => {
+        setIsAiSpeaking(true);
+        isAiSpeakingRef.current = true;
+      };
+      utterance.onend = () => {
+        setIsAiSpeaking(false);
+        isAiSpeakingRef.current = false;
+        lastNudgeTimeRef.current = Date.now();
+      };
+      utterance.onerror = (err) => {
+        console.warn('TTS error:', err);
+        setIsAiSpeaking(false);
+        isAiSpeakingRef.current = false;
+      };
+
+      // Workaround for Chrome 15s synthesis pause bug
+      const resumeTimer = setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        } else {
+          clearInterval(resumeTimer);
+        }
+      }, 5000);
+
       window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Voice speech exception:', e);
+      setIsAiSpeaking(false);
+      isAiSpeakingRef.current = false;
     }
   };
 
@@ -178,8 +216,19 @@ export default function StudentPortal() {
           }
         },
         onSilenceDetected: ({ silenceDurationSec }) => {
+          const duration = parseFloat(silenceDurationSec);
+          // If candidate has typed/spoken text and paused
           if (studentInput.trim().length > 10) {
             setSilenceNotice(`Sustained silence (${silenceDurationSec}s). Click 'Submit Answer' when ready.`);
+          }
+
+          // Proactive AI speech intervention: if candidate has been quiet for > 8s and AI isn't currently speaking
+          const now = Date.now();
+          if (duration >= 8.0 && !isAiSpeakingRef.current && (now - lastNudgeTimeRef.current) > 14000) {
+            lastNudgeTimeRef.current = now;
+            const nudgePrompt = "Why are you not speaking? Speak something. I am listening to your answer.";
+            setSilenceNotice("AI Examiner: Why are you not speaking? Speak something.");
+            speakText(nudgePrompt);
           }
         },
         silenceThresholdSec: 3.5,
@@ -256,6 +305,7 @@ export default function StudentPortal() {
       const data = await res.json();
       setSessionId(data.session_id);
       setAiQuestion(data.first_question);
+      aiQuestionRef.current = data.first_question;
       setCurrentPhase(data.phase);
       setQuestionType(data.question_type);
       setCurrentStep(1); // Step 1: Introduction
@@ -279,8 +329,12 @@ export default function StudentPortal() {
   const handleWarpComplete = async () => {
     setIsWarping(false);
     setIsStarted(true);
-    if (aiQuestion) {
-      speakText(aiQuestion);
+    const textToSpeak = aiQuestionRef.current || aiQuestion;
+    if (textToSpeak) {
+      // Small timeout to allow UI transition and Web Audio context unlock
+      setTimeout(() => {
+        speakText(textToSpeak);
+      }, 250);
     }
     await setupAudioCapture();
   };
@@ -613,19 +667,6 @@ export default function StudentPortal() {
           </button>
         </div>
 
-        {/* 3D Solar System Animation from rishiraj38.github.io */}
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', padding: '0 8px' }}>
-            <span className="eyebrow" style={{ fontSize: '0.68rem' }}>
-              3D GRAVITATIONAL CELESTIAL ENGINE
-            </span>
-            <span className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>
-              Interactive Orbit Simulation
-            </span>
-          </div>
-          <SolarSystem3D height="440px" />
-        </div>
-
         {/* Singularity Cosmic Black Hole Warp Transition from rishiraj38.github.io */}
         {isWarping && <SingularityWarp onComplete={handleWarpComplete} />}
       </div>
@@ -787,16 +828,42 @@ export default function StudentPortal() {
               />
             </div>
 
-            {/* Question Text Box */}
+            {/* Question Text Box with Listen Again button */}
             <div style={{
               background: '#F8FAFC',
               border: '1px solid var(--rule)',
               borderRadius: 'var(--radius-md)',
               padding: '18px',
-              marginBottom: '16px'
+              marginBottom: '16px',
+              position: 'relative'
             }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--nebula)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                Examiner Question:
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--nebula)', textTransform: 'uppercase' }}>
+                  Examiner Question (English):
+                </div>
+                {aiQuestion && (
+                  <button
+                    type="button"
+                    onClick={() => speakText(aiQuestion)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      color: 'var(--nebula)',
+                      border: '1px solid rgba(99, 102, 241, 0.25)',
+                      borderRadius: '4px',
+                      padding: '3px 8px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Re-speak question aloud"
+                  >
+                    <Volume2 size={12} />
+                    <span>Repeat Voice</span>
+                  </button>
+                )}
               </div>
               <p style={{
                 fontFamily: 'var(--body)',
