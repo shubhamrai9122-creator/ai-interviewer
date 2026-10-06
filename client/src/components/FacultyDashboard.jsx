@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, CheckCircle, AlertTriangle, Play, Pause, RotateCcw, 
   Award, ShieldAlert, FileText, Check, X, Download, Sliders, Sparkles, MessageSquare,
-  Volume2, Code2, GitBranch, Clock, PlusCircle, CornerDownRight, Upload, Layers, Settings
+  Volume2, Code2, GitBranch, Clock, PlusCircle, CornerDownRight, Upload, Layers, Settings, Trash2
 } from 'lucide-react';
 import VoiceSettingsModal from './VoiceSettingsModal';
 
@@ -148,6 +148,32 @@ export default function FacultyDashboard() {
       console.error('Failed to load audit data:', err);
     } finally {
       setLoadingAudit(false);
+    }
+  };
+
+  // Delete student viva record
+  const handleDeleteSession = async (sessionId, studentName, e) => {
+    if (e) e.stopPropagation();
+    const confirmed = window.confirm(`Are you sure you want to delete the viva examination record for "${studentName}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/faculty/sessions/${sessionId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (selectedSessionId === sessionId) {
+          setSelectedSessionId(null);
+          setAuditData(null);
+        }
+        await loadSessions();
+        await loadCalibration();
+      } else {
+        alert('Failed to delete session: ' + (data.detail || 'Error'));
+      }
+    } catch (err) {
+      alert('Error deleting session: ' + err.message);
     }
   };
 
@@ -534,12 +560,34 @@ export default function FacultyDashboard() {
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)' }}>
-                        <span className="mono">{s.student_id}</span>
-                        {s.flagged && (
-                          <span className="badge badge-rose" style={{ fontSize: '9px', padding: '1px 6px' }}>
-                            <ShieldAlert size={10} /> Flagged
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="mono">{s.student_id}</span>
+                          {s.flagged && (
+                            <span className="badge badge-rose" style={{ fontSize: '9px', padding: '1px 6px' }}>
+                              <ShieldAlert size={10} /> Flagged
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(s.session_id, s.student_name, e)}
+                          title="Delete Candidate Record"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            padding: '3px 6px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+                          onMouseLeave={e => e.currentTarget.style.color = '#94A3B8'}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -567,13 +615,32 @@ export default function FacultyDashboard() {
                       Duration: {Math.round(auditData.session.elapsed_seconds / 60)}m • Prompt Version: {auditData.session.scoring_prompt_version}
                     </span>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--nebula)' }}>
-                      {auditData.session.final_score}/100
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--nebula)' }}>
+                        {auditData.session.final_score}/100
+                      </div>
+                      <span className="badge badge-purple" style={{ fontSize: '10px' }}>
+                        Confidence: {Math.round((auditData.score?.confidence || 0.9) * 100)}%
+                      </span>
                     </div>
-                    <span className="badge badge-purple" style={{ fontSize: '10px' }}>
-                      Confidence: {Math.round((auditData.score?.confidence || 0.9) * 100)}%
-                    </span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteSession(auditData.session.id, auditData.session.student_name, e)}
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '11px',
+                        color: '#EF4444',
+                        borderColor: 'rgba(239, 68, 68, 0.3)',
+                        background: '#FEF2F2'
+                      }}
+                      title="Permanently Delete this Student Session"
+                    >
+                      <Trash2 size={13} />
+                      Delete Record
+                    </button>
                   </div>
                 </div>
 

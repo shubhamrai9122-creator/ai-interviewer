@@ -142,45 +142,6 @@ export default function Navbar({ activeTab, setActiveTab }) {
           </div>
         </div>
       </header>
-
-      {/* Clean Ticker Belt: strictly DSA & Web Development only */}
-      <div className="belts">
-        <div className="belt-track">
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Data Structures & Algorithms</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-purple" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>Web Development & Systems Architecture</span>
-          </div>
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Adaptive Complexity Probing</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>Full-Stack Engineering Assessment</span>
-          </div>
-          {/* Duplicate set for seamless loop */}
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Data Structures & Algorithms</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-purple" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>Web Development & Systems Architecture</span>
-          </div>
-          <div className="belt-item">
-            <span className="sun-pulse" style={{ width: '6px', height: '6px' }} />
-            <span>DSA: Adaptive Complexity Probing</span>
-          </div>
-          <div className="belt-item">
-            <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 6px' }}>Web Dev</span>
-            <span>Full-Stack Engineering Assessment</span>
-          </div>
-        </div>
-      </div>
     </>
   );
 }

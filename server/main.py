@@ -940,6 +940,26 @@ def override_score(req: OverrideRequest, db: Session = Depends(get_db)):
         "faculty_name": req.faculty_name
     }
 
+@app.delete("/api/faculty/sessions/{session_id}")
+def delete_faculty_session(session_id: int, db: Session = Depends(get_db)):
+    """Deletes a student viva session and all its associated answers, scores, and integrity logs."""
+    session = db.query(VivaSession).filter(VivaSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session record not found")
+
+    student_name = session.student_name
+    student_id = session.student_id
+
+    # Cascade deletes answers, questions asked, score, evidences, overrides, integrity logs
+    db.delete(session)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Successfully deleted record for {student_name} ({student_id}).",
+        "deleted_session_id": session_id
+    }
+
 @app.get("/api/faculty/calibration")
 def get_calibration_stats(db: Session = Depends(get_db)):
     """Computes AI marks vs Faculty marks calibration stats (correlation, MAE, variance)."""
