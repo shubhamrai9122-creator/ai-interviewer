@@ -151,19 +151,19 @@ const highlightSyntax = (rawCode, lang) => {
   escaped = escaped.replace(/("(\\"|[^"])*"|'(\\'|[^'])*'|`(\\`|[^`])*`)/g, (m) => saveToken(`<span style="color: #A31515;">${m}</span>`));
 
   // 3. Types (teal)
-  escaped = escaped.replace(/\b(int|string|vector|bool|boolean|void|float|double|char|long|List|Dict|TreeNode|ListNode|Solution|Array|Object|Function|number|Promise|size_t)\b/g, (m) => `<span style="color: #267F99; font-weight: 600;">${m}</span>`);
+  escaped = escaped.replace(/\b(int|string|vector|bool|boolean|void|float|double|char|long|List|Dict|TreeNode|ListNode|Solution|Array|Object|Function|number|Promise|size_t)\b/g, (m) => saveToken(`<span style="color: #267F99; font-weight: 600;">${m}</span>`));
 
   // 4. Keywords (blue)
-  escaped = escaped.replace(/\b(class|public|private|protected|return|var|let|const|function|def|import|from|for|while|if|else|new|this|auto|using|namespace|struct|static|async|await|try|catch|throw|typeof|instanceof|switch|case|break|continue|pass)\b/g, (m) => `<span style="color: #0000FF; font-weight: 600;">${m}</span>`);
+  escaped = escaped.replace(/\b(class|public|private|protected|return|var|let|const|function|def|import|from|for|while|if|else|new|this|auto|using|namespace|struct|static|async|await|try|catch|throw|typeof|instanceof|switch|case|break|continue|pass)\b/g, (m) => saveToken(`<span style="color: #0000FF; font-weight: 600;">${m}</span>`));
 
   // 5. Literals (blue)
-  escaped = escaped.replace(/\b(true|false|null|nullptr|None|undefined)\b/g, (m) => `<span style="color: #0000FF; font-weight: 600;">${m}</span>`);
+  escaped = escaped.replace(/\b(true|false|null|nullptr|None|undefined)\b/g, (m) => saveToken(`<span style="color: #0000FF; font-weight: 600;">${m}</span>`));
 
-  // 6. Numbers (olive green)
-  escaped = escaped.replace(/\b(\d+(\.\d+)?)\b/g, (m) => `<span style="color: #098658;">${m}</span>`);
+  // 6. Functions (brown / olive)
+  escaped = escaped.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, (m) => saveToken(`<span style="color: #795E26;">${m}</span>`));
 
-  // 7. Functions (brown / olive)
-  escaped = escaped.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, (m) => `<span style="color: #795E26;">${m}</span>`);
+  // 7. Numbers (olive green)
+  escaped = escaped.replace(/\b(\d+(\.\d+)?)\b/g, (m) => saveToken(`<span style="color: #098658;">${m}</span>`));
 
   // 8. Restore tokens
   escaped = escaped.replace(/___TOKEN_(\d+)___/g, (_, idx) => tokens[parseInt(idx, 10)]);

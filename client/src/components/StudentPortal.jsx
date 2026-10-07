@@ -424,7 +424,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
 
   handleTurnSubmitRef.current = handleTurnSubmit;
 
-  // End Interview & Fetch Evaluation
+  // End Interview & Submit to Faculty / Admin
   const handleEndInterview = async () => {
     if (!sessionId) return;
     try {
@@ -432,7 +432,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       const data = await res.json();
       setCompletionResult(data);
       setVivaCompleted(true);
-      setIsScorecardOpen(true);
+      setIsScorecardOpen(false);
     } catch (err) {
       console.error("Failed to end interview:", err);
     }
@@ -846,6 +846,112 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   }
 
   // =========================================================================
+  // SUBMISSION STATUS VIEW (EVALUATION REPORT RESTRICTED TO ADMIN ONLY)
+  // =========================================================================
+  if (vivaCompleted) {
+    return (
+      <div style={{ maxWidth: '720px', margin: '48px auto', padding: '0 20px', textAlign: 'center', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div className="is-card" style={{ padding: '40px 32px', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: isTerminatedDueToTabs ? '#FEE2E2' : '#ECFDF5',
+            color: isTerminatedDueToTabs ? '#DC2626' : '#10B981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 18px',
+            fontSize: '32px'
+          }}>
+            {isTerminatedDueToTabs ? '⚠️' : '✅'}
+          </div>
+
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1E293B', marginBottom: '8px' }}>
+            {isTerminatedDueToTabs ? 'Interview Concluded & Submitted' : 'Interview Submitted Successfully'}
+          </h2>
+
+          <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.6, marginBottom: '24px' }}>
+            Thank you, <strong>{studentName}</strong>. Your technical interview for the <strong>{selectedDomain === 'webdev' ? 'Web Development Track' : 'Data Structures & Algorithms Track'}</strong> has been officially concluded and submitted to the evaluation committee.
+          </p>
+
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            padding: '16px 20px',
+            textAlign: 'left',
+            marginBottom: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+              <span style={{ color: '#64748B' }}>Candidate ID:</span>
+              <strong style={{ color: '#1E293B' }}>{candidateId}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+              <span style={{ color: '#64748B' }}>Domain Track:</span>
+              <strong style={{ color: '#1E293B' }}>{selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+              <span style={{ color: '#64748B' }}>Problem Completed:</span>
+              <strong style={{ color: '#1E293B' }}>{codingProblemDetails?.title || (selectedDomain === 'webdev' ? '2627. Debounce' : '1. Two Sum')}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+              <span style={{ color: '#64748B' }}>Tab Switch Violations:</span>
+              <strong style={{ color: tabSwitchCount === 0 ? '#10B981' : tabSwitchCount < 3 ? '#F59E0B' : '#DC2626' }}>
+                {tabSwitchCount} / 3 {tabSwitchCount >= 3 ? '(Flagged by Proctor)' : ''}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+              <span style={{ color: '#64748B' }}>Submission Status:</span>
+              <span style={{ color: '#10B981', fontWeight: 700 }}>✅ Delivered to Faculty Database</span>
+            </div>
+          </div>
+
+          <div style={{
+            background: '#EFF6FF',
+            border: '1px solid #BFDBFE',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            fontSize: '12px',
+            color: '#1E40AF',
+            lineHeight: 1.5,
+            marginBottom: '24px',
+            textAlign: 'left'
+          }}>
+            🔒 <strong>Confidential Examination Policy:</strong> Detailed evaluation scorecards, rubric breakups, and faculty calibration analytics are restricted to MSOT administrators and faculty reviewers. Your results will be processed through the Admin Dashboard.
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsStarted(false);
+              setVivaCompleted(false);
+              setSessionId(null);
+              setElapsedSeconds(0);
+              setTabSwitchCount(0);
+              tabSwitchCountRef.current = 0;
+              setIsTabLocked(false);
+              setIsTerminatedDueToTabs(false);
+              setCodeContent('');
+              setStudentInput('');
+              setTranscriptFeed([]);
+              setHintsUsed(0);
+              setIsHintRevealed(false);
+            }}
+            className="is-btn-primary"
+            style={{ padding: '12px 28px', fontSize: '14px' }}
+          >
+            Start New Session
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
   // LIVE MSOT CODE ARENA (EXACT SPLIT PANE MATCHING THE PHOTO)
   // Left: Problem Description, Badges, Examples, Constraints, Hint, Stats
   // Right: Light Theme Code Editor with Line Gutter, Syntax Highlighting & Testcase Console
@@ -1182,15 +1288,11 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
 
           {/* Problem Body Content (Scrollable) */}
           <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-            {/* Title & Solved Indicator */}
+            {/* Title */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#111827', margin: 0 }}>
                 {problemTitle}
               </h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#10B981', fontWeight: 600 }}>
-                <CheckCircle2 size={14} color="#10B981" />
-                <span>Solved</span>
-              </div>
             </div>
 
             {/* Badges Row: Easy (Teal Pill), Topics, Companies, Hint */}
@@ -1543,7 +1645,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   type="button"
                   onClick={() => {
                     setIsTabLocked(false);
-                    setIsScorecardOpen(true);
                   }}
                   style={{
                     width: '100%',
@@ -1557,7 +1658,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                     cursor: 'pointer'
                   }}
                 >
-                  View Final Evaluation Scorecard
+                  Acknowledge & View Submission Status
                 </button>
               </>
             ) : (
@@ -1708,18 +1809,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             </div>
           </div>
         </div>
-      )}
-
-      {/* Scorecard Modal */}
-      {isScorecardOpen && (
-        <ScorecardModal
-          isOpen={isScorecardOpen}
-          onClose={() => setIsScorecardOpen(false)}
-          result={completionResult}
-          studentName={studentName}
-          studentId={candidateId}
-          subjectTitle={selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}
-        />
       )}
     </div>
   );
