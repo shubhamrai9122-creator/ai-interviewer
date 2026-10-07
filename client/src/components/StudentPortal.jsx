@@ -3,7 +3,7 @@ import {
   Mic, MicOff, Volume2, Shield, Clock, AlertTriangle, 
   Send, HelpCircle, CheckCircle2, Award, FileText,
   Code2, Sparkles, UserCheck, AudioLines, Layers, ArrowRight, CornerDownRight, Play,
-  Wifi, Camera, Check, RefreshCw
+  Wifi, Camera, Check, RefreshCw, ThumbsUp, ThumbsDown, Star, Share2, ChevronDown, ChevronUp, MessageSquare
 } from 'lucide-react';
 
 import AudioVisualizer from './AudioVisualizer';
@@ -16,11 +16,10 @@ const API_BASE = 'http://localhost:8000';
 
 export default function StudentPortal({ initialSyllabus, onNavigateToTraining }) {
   // Pre-Interview Setup States
-  const [setupStep, setSetupStep] = useState(1); // 1 = System Checks, 2 = Track & Syllabus, 3 = Guidelines
+  const [setupStep, setSetupStep] = useState(1); // 1 = System Checks, 2 = Track Selection, 3 = Guidelines
   const [selectedDomain, setSelectedDomain] = useState('dsa'); // 'dsa' or 'webdev'
   const [studentName, setStudentName] = useState('Rahul Sharma');
-  const [candidateId, setCandidateId] = useState('IS-2026-DSA');
-  const [targetLevel, setTargetLevel] = useState('Intermediate');
+  const [candidateId, setCandidateId] = useState('MSOT-2026-DSA');
   const [availableSyllabi, setAvailableSyllabi] = useState([]);
   const [selectedSyllabusId, setSelectedSyllabusId] = useState(null);
   const [consentGiven, setConsentGiven] = useState(false);
@@ -37,9 +36,9 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const [sessionId, setSessionId] = useState(null);
   const [activeSyllabusTitle, setActiveSyllabusTitle] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [currentPhase, setCurrentPhase] = useState('WARMUP');
+  const [currentPhase, setCurrentPhase] = useState('DEPTH');
   const [aiQuestion, setAiQuestion] = useState('');
-  const [questionType, setQuestionType] = useState('PROJECT');
+  const [questionType, setQuestionType] = useState('CONCEPT');
   const [studentInput, setStudentInput] = useState('');
   const [transcriptFeed, setTranscriptFeed] = useState([]);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
@@ -50,34 +49,24 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const [completionResult, setCompletionResult] = useState(null);
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
+  const [isHintRevealed, setIsHintRevealed] = useState(false);
+  const [isIraConsoleExpanded, setIsIraConsoleExpanded] = useState(true);
 
-  // Proctoring & Anti-Cheat Tab Switch States
+  // Proctoring & Anti-Cheat Tab Switch States (Strict 3-Switch Rule)
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isTabLocked, setIsTabLocked] = useState(false);
+  const [isTerminatedDueToTabs, setIsTerminatedDueToTabs] = useState(false);
   const [cursorExitWarning, setCursorExitWarning] = useState(false);
   const [showEndConfirmModal, setShowEndConfirmModal] = useState(false);
   const tabSwitchCountRef = useRef(0);
 
   // Dynamic Coding Question Views
-  const [isCodingQuestion, setIsCodingQuestion] = useState(false);
+  const [isCodingQuestion, setIsCodingQuestion] = useState(true);
   const [shouldAskToRead, setShouldAskToRead] = useState(false);
   const [codingProblemDetails, setCodingProblemDetails] = useState(null);
 
   // Code editor state
   const [codeContent, setCodeContent] = useState('');
-
-  // Audio Telemetry
-  const [audioVolume, setAudioVolume] = useState(0);
-  const [frequencyData, setFrequencyData] = useState([]);
-  const [isSpeakingLive, setIsSpeakingLive] = useState(false);
-  const [speechTurnStartSec, setSpeechTurnStartSec] = useState(null);
-  const [acousticMetrics, setAcousticMetrics] = useState({
-    wpm: 0,
-    wpmStatus: 'Ready',
-    fillerCounts: {},
-    totalFillers: 0,
-    fluencyScore: 100
-  });
 
   // Fixed 15-Minute Limit
   const durationMinutes = 15;
@@ -88,7 +77,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const handleTurnSubmitRef = useRef(null);
   const isAiSpeakingRef = useRef(false);
 
-  // Strict Tab Switch / Window Blur Lockdown (Anti-Cheating Proctoring Alert)
+  // Strict Tab Switch / Window Blur Lockdown (Auto-Ends Interview on 3rd Switch)
   useEffect(() => {
     if (!isStarted || vivaCompleted) return;
 
@@ -99,6 +88,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
         setTabSwitchCount(nextCount);
         setIsTabLocked(true);
 
+        // Log integrity event to backend
         if (sessionId) {
           fetch(`${API_BASE}/api/session/integrity`, {
             method: 'POST',
@@ -111,17 +101,23 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
               metadata_json: {
                 violation_count: nextCount,
                 timestamp: Date.now(),
-                note: `Candidate attempted tab switch / window blur (Strict Lockdown Event #${nextCount})`
+                note: `Candidate attempted tab switch / window blur (#${nextCount}/3)`
               }
             })
           }).catch(err => console.warn("Failed to log integrity event:", err));
+        }
+
+        // Hard enforcement: after 3 tab switches, immediately terminate interview!
+        if (nextCount >= 3) {
+          setIsTerminatedDueToTabs(true);
+          handleEndInterview();
         }
       }
     };
 
     const handleBeforeUnload = (e) => {
       e.preventDefault();
-      e.returnValue = 'Interview in progress! Are you sure you want to leave? Your interview will be ended.';
+      e.returnValue = 'Interview in progress! Leaving this tab will disqualify and end your session.';
       return e.returnValue;
     };
 
@@ -189,7 +185,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   };
 
   const runSystemChecks = async () => {
-    // 1. Camera check
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setCameraStream(stream);
@@ -200,11 +195,10 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       }
     } catch (err) {
       console.warn("Camera/Mic permission warning:", err);
-      setCamStatus('ready'); // Fallback to ready for simulation
+      setCamStatus('ready');
       setMicStatus('ready');
     }
 
-    // 2. Ping latency check
     const startPing = Date.now();
     try {
       await fetch(`${API_BASE}/api/syllabus/active`);
@@ -220,7 +214,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
-    // Prefer natural, standard English voices
     const preferred = ['Google US English', 'Samantha', 'Alex', 'Daniel', 'Victoria', 'Microsoft David', 'Microsoft Zira'];
     for (const name of preferred) {
       const match = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
@@ -233,7 +226,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
     if (!('speechSynthesis' in window) || !text) return;
     window.speechSynthesis.cancel();
 
-    // Clean markdown before speaking
     const clean = text
       .replace(/\[Hint Level \d+\]:/g, 'Here is a hint:')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -245,7 +237,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
     const naturalVoice = getNaturalVoice();
     if (naturalVoice) utterance.voice = naturalVoice;
 
-    // Normal natural human voice pitch and cadence
     utterance.pitch = 1.0;
     utterance.rate = 1.0;
 
@@ -291,7 +282,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
 
     rec.onstart = () => {
       setIsListening(true);
-      if (!speechTurnStartSec) setSpeechTurnStartSec(elapsedSeconds);
     };
 
     rec.onresult = (event) => {
@@ -330,7 +320,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
     return () => clearInterval(interval);
   }, [isStarted, vivaCompleted]);
 
-  // Handle Starting the Interview Session
+  // Handle Starting the Interview Session - DIRECT START WITH TECHNICAL PROBLEM
   const handleStartInterview = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/session/start`, {
@@ -351,7 +341,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       const data = await res.json();
       setSessionId(data.session_id);
       setAiQuestion(data.first_question || data.initial_prompt);
-      setCurrentPhase(data.phase || 'WARMUP');
+      setCurrentPhase(data.phase || 'DEPTH');
       setActiveSyllabusTitle(data.active_syllabus_title);
       setIsCodingQuestion(Boolean(data.is_coding_question));
       setShouldAskToRead(Boolean(data.should_ask_to_read));
@@ -361,7 +351,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       speakText(data.first_question || data.initial_prompt);
     } catch (err) {
       console.error("Failed to start session:", err);
-      alert("Could not connect to AI Interview backend. Ensure FastAPI server is running on port 8000.");
+      alert("Could not connect to MSOT AI Interview backend. Ensure FastAPI server is running on port 8000.");
     }
   };
 
@@ -382,7 +372,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       setIsListening(false);
     }
 
-    // Add candidate turn to transcript
     if (transcriptText) {
       setTranscriptFeed(prev => [...prev, { speaker: 'candidate', text: transcriptText }]);
     }
@@ -394,7 +383,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
         body: JSON.stringify({
           session_id: sessionId,
           elapsed_seconds: elapsedSeconds,
-          transcript: transcriptText || (isHint ? "Can I get a progressive hint?" : "Let's move to next question"),
+          transcript: transcriptText || (isHint ? "Could you provide a hint for this problem?" : "Let's move to the next phase"),
           is_silence: false,
           is_giveup: isGiveUp,
           is_hint_request: isHint,
@@ -407,16 +396,16 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
       setCurrentPhase(data.current_phase);
       setQuestionType(data.question_type);
       setLastLatencyMs(data.latency_ms);
-      setHintsUsed(data.hints_used || (isHint ? hintsUsed + 1 : hintsUsed));
+      setHintsUsed(data.hints_used || (isHint ? 1 : hintsUsed));
       setIsCodingQuestion(Boolean(data.is_coding_question));
       setShouldAskToRead(Boolean(data.should_ask_to_read));
-      setCodingProblemDetails(data.coding_problem_details || null);
+      if (data.coding_problem_details) {
+        setCodingProblemDetails(data.coding_problem_details);
+      }
 
-      // Append Ira response
       setTranscriptFeed(prev => [...prev, { speaker: 'ira', text: data.ai_response_text }]);
       setStudentInput('');
 
-      // Spoken voice policy: if audio_spoken_text is present (e.g. asking before reading full coding problem), speak it!
       if (data.audio_spoken_text) {
         speakText(data.audio_spoken_text);
       } else {
@@ -449,6 +438,14 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
     }
   };
 
+  const toggleSingleHint = () => {
+    setIsHintRevealed(prev => !prev);
+    if (!isHintRevealed && hintsUsed === 0) {
+      setHintsUsed(1);
+      handleTurnSubmit({ isHint: true, explicitText: "Can I receive the hint for this problem?" });
+    }
+  };
+
   const formatTime = (totalSec) => {
     const m = Math.floor(totalSec / 60);
     const s = Math.floor(totalSec % 60);
@@ -460,10 +457,11 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
 
   // =========================================================================
   // PRE-INTERVIEW SETUP: 3-STEP WIZARD (System Checks -> Track Selection -> Guidelines)
+  // No difficulty level dropdown (intermediate/beginner removed)
   // =========================================================================
   if (!isStarted) {
     return (
-      <div style={{ maxWidth: '980px', margin: '32px auto', padding: '0 20px' }}>
+      <div style={{ maxWidth: '980px', margin: '32px auto', padding: '0 20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         {/* Wizard Step Tabs */}
         <div style={{
           display: 'flex',
@@ -540,7 +538,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>Hardware & Proctoring Readiness</h2>
                 <p style={{ fontSize: '13px', color: '#64748B' }}>
-                  Internshala AI Mock Interview uses live video, audio analysis, and code sandbox execution.
+                  MSOT Code Arena AI Interview uses real-time webcam telemetry, speech synthesis, and sandboxed code execution.
                 </p>
               </div>
             </div>
@@ -564,7 +562,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   muted
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
-                {/* Face positioning reticle */}
                 <div style={{
                   position: 'absolute',
                   width: '140px',
@@ -615,7 +612,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                 <div style={{ padding: '12px 16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Code2 size={18} color="#008BDC" />
-                    <span style={{ fontSize: '13px', fontWeight: 600 }}>DSA Code Sandbox</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Code Arena Sandbox</span>
                   </div>
                   <span className="is-badge-green">Ready</span>
                 </div>
@@ -635,14 +632,14 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
           </div>
         )}
 
-        {/* STEP 2: TRACK SELECTION */}
+        {/* STEP 2: TRACK SELECTION (NO LEVELS - SIMPLE & CLEAN) */}
         {setupStep === 2 && (
           <div className="is-card is-card-highlight">
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
               Select Examination Track
             </h2>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>
-              The interview is strictly focused on <strong>Data Structures & Algorithms (DSA)</strong> or <strong>Web Development</strong>.
+              Select either <strong>Data Structures & Algorithms (DSA)</strong> or <strong>Web Development</strong>. The interview begins immediately with your technical problem upon entering the arena.
             </p>
 
             {/* Track Selector */}
@@ -667,7 +664,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   {selectedDomain === 'dsa' && <CheckCircle2 size={18} color="#008BDC" />}
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569' }}>
-                  Arrays, Sliding Window, Trees, Graphs, Dynamic Programming & Complexity Analysis. Standard Language: C++.
+                  Arrays, Sliding Window, Trees, Graphs, Complexity Analysis. Standard Language: C++.
                 </div>
               </button>
 
@@ -691,13 +688,13 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   {selectedDomain === 'webdev' && <CheckCircle2 size={18} color="#FF6B00" />}
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569' }}>
-                  React Reconciliation, Node.js Event Loop, JWT Auth Security & Database Optimization. Standard Language: JavaScript.
+                  React Reconciliation, Node.js Event Loop, JWT Auth, Closures & Debouncing. Standard Language: JavaScript.
                 </div>
               </button>
             </div>
 
-            {/* Candidate Details & Level */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '26px' }}>
+            {/* Candidate Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '26px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
                   Candidate Name
@@ -720,21 +717,6 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   onChange={(e) => setCandidateId(e.target.value)}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
                 />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                  Target Level
-                </label>
-                <select
-                  value={targetLevel}
-                  onChange={(e) => setTargetLevel(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF', boxSizing: 'border-box' }}
-                >
-                  <option value="Beginner">Beginner (Foundations)</option>
-                  <option value="Intermediate">Intermediate (Core SDE)</option>
-                  <option value="Advanced">Advanced (FAANG Level)</option>
-                </select>
               </div>
             </div>
 
@@ -763,46 +745,46 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
         {setupStep === 3 && (
           <div className="is-card is-card-highlight">
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-              Internshala AI Interview Guidelines & Code of Conduct
+              MSOT Code Arena Examination Guidelines & Proctoring Code
             </h2>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>
-              Please review how Ira evaluates your technical reasoning before entering the arena.
+              Please review the examination rules before entering the live technical arena.
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  1. Adaptive One-Question Pacing
+                  1. Direct Problem Start
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  Ira asks ONE question at a time. She evaluates your specific response and probes deeper with follow-up scenarios.
+                  The interview starts directly with your technical coding problem. No introductory or warmup questions are asked.
                 </div>
               </div>
 
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  2. Think First, Code Second
+                  2. Strict 3 Tab Switch Limit
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  Explain your observations, approach, and Big-O complexity verbally or in text before writing code in the sandbox.
+                  Tab switching is strictly monitored. On your <strong>3rd tab switch</strong>, the interview is immediately terminated and flagged.
                 </div>
               </div>
 
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  3. 4-Level Progressive Hints
+                  3. 1 Focused Technical Hint
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  If you are stuck, ask Ira for a hint. Hints progress from high-level direction (Level 1) to near-solution (Level 4).
+                  If you are stuck, exactly 1 targeted hint is available on the problem card to unlock your algorithmic intuition.
                 </div>
               </div>
 
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  4. Quality of Thinking Matters
+                  4. Explain First, Then Code
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  You are not evaluated only on whether your first approach is optimal, but on your ability to refine and debug.
+                  Explain your approach and Big-O complexity to Ira verbally or in text, then implement and run your solution in the arena.
                 </div>
               </div>
             </div>
@@ -824,10 +806,10 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                 />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '13px', color: consentGiven ? '#065F46' : '#1E293B' }}>
-                    I agree to the Mirai School of Technology (MSOT) AI Mock Interview Honor Code
+                    I agree to the Mirai School of Technology (MSOT) Code Arena Honor Code
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    I declare that this interview will be taken without unauthorized external human assistance, and I authorize proctoring recording.
+                    I declare that this interview will be taken without unauthorized external assistance, and I acknowledge that switching tabs 3 times will result in immediate disqualification.
                   </div>
                 </div>
               </label>
@@ -854,7 +836,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   background: consentGiven ? '#008BDC' : '#94A3B8'
                 }}
               >
-                Start MSOT AI Interview with Ira ▶
+                Enter MSOT Code Arena ▶
               </button>
             </div>
           </div>
@@ -864,69 +846,91 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   }
 
   // =========================================================================
-  // LIVE AI INTERVIEW ROOM (DYNAMIC CODING DASHBOARD & PROCTORING)
+  // LIVE MSOT CODE ARENA (EXACT SPLIT PANE MATCHING THE PHOTO)
+  // Left: Problem Description, Badges, Examples, Constraints, Hint, Stats
+  // Right: Light Theme Code Editor with Line Gutter, Syntax Highlighting & Testcase Console
   // =========================================================================
+  const problemTitle = codingProblemDetails?.title || (selectedDomain === 'webdev' ? '2627. Debounce' : '1. Two Sum');
+  const problemLevel = codingProblemDetails?.level || 'Easy';
+  const problemTopic = codingProblemDetails?.topic || (selectedDomain === 'webdev' ? 'JavaScript Event Loop & Closures' : 'Arrays & Hash Table');
+  const problemStatement = codingProblemDetails?.statement || (
+    selectedDomain === 'webdev'
+      ? "Given a function fn and a time in milliseconds t, return a debounced version of that function.\n\nA debounced function is a function whose execution is delayed by t milliseconds and whose execution is cancelled if it is called again within that window of time. The debounced function should also receive the passed parameters."
+      : "You are given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nYou can return the answer in any order."
+  );
+
+  const problemHint = (codingProblemDetails?.hints && codingProblemDetails.hints[0]) || (
+    selectedDomain === 'webdev'
+      ? "Maintain a timerId variable in a closure. On every call, clearTimeout(timerId) and reset timerId = setTimeout(() => fn(...args), t) so only the final burst call triggers."
+      : "Use an unordered_map (hash table) to store each number and its index. As you iterate through nums, check if the complement (target - nums[i]) already exists in the map in average O(1) time."
+  );
+
   return (
-    <div style={{ maxWidth: isCodingQuestion ? '1600px' : '960px', margin: '16px auto', padding: '0 20px', transition: 'max-width 0.3s ease' }}>
-      {/* Top Header Bar */}
+    <div style={{ maxWidth: '1720px', margin: '10px auto', padding: '0 16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      
+      {/* 1. TOP STATUS & PROCTOR BAR */}
       <div style={{
         background: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '10px',
-        padding: '12px 20px',
-        marginBottom: '16px',
+        border: '1px solid #E5E7EB',
+        borderRadius: '8px',
+        padding: '10px 18px',
+        marginBottom: '12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
       }}>
-        {/* Left: Domain & Timer */}
+        {/* Left: Branding, Domain & Timer */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
+            <span style={{ color: '#008BDC' }}>MSOT</span> Code Arena
+          </div>
+
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '5px 12px',
+            padding: '4px 12px',
             borderRadius: '6px',
             background: remainingSec <= 180 ? '#FEF2F2' : '#F1F5F9',
             border: `1px solid ${remainingSec <= 180 ? '#FCA5A5' : '#E2E8F0'}`
           }}>
-            <Clock size={15} color={remainingSec <= 180 ? '#EF4444' : '#008BDC'} />
-            <span style={{ fontSize: '14px', fontWeight: 800, color: remainingSec <= 180 ? '#EF4444' : '#1E293B', fontFamily: 'monospace' }}>
+            <Clock size={14} color={remainingSec <= 180 ? '#EF4444' : '#008BDC'} />
+            <span style={{ fontSize: '13px', fontWeight: 800, color: remainingSec <= 180 ? '#EF4444' : '#1E293B', fontFamily: 'monospace' }}>
               {formatTime(remainingSec)}
             </span>
             <span style={{ fontSize: '11px', color: '#64748B' }}>/ 15:00</span>
           </div>
 
           <span className={selectedDomain === 'webdev' ? 'is-badge-orange' : 'is-badge-blue'}>
-            {selectedDomain === 'webdev' ? 'Web Development Track' : 'Data Structures & Algorithms Track'}
+            {selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track (C++)'}
           </span>
 
-          {/* Anti-Cheating Tab Switch Proctor Badge */}
+          {/* Anti-Cheating Tab Switch Proctor Badge (Hard limit: 3) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             padding: '4px 10px',
             borderRadius: '6px',
-            background: tabSwitchCount === 0 ? '#ECFDF5' : tabSwitchCount < 3 ? '#FFFBEB' : '#FEF2F2',
-            border: `1px solid ${tabSwitchCount === 0 ? '#A7F3D0' : tabSwitchCount < 3 ? '#FDE68A' : '#FECACA'}`,
+            background: tabSwitchCount === 0 ? '#ECFDF5' : tabSwitchCount < 2 ? '#FFFBEB' : '#FEF2F2',
+            border: `1px solid ${tabSwitchCount === 0 ? '#A7F3D0' : tabSwitchCount < 2 ? '#FDE68A' : '#FECACA'}`,
             fontSize: '12px',
             fontWeight: 700,
-            color: tabSwitchCount === 0 ? '#065F46' : tabSwitchCount < 3 ? '#B45309' : '#DC2626'
+            color: tabSwitchCount === 0 ? '#065F46' : tabSwitchCount < 2 ? '#B45309' : '#DC2626'
           }}>
             <Shield size={14} />
-            <span>Tab Switches: {tabSwitchCount} / 3</span>
+            <span>Tab Switches: {tabSwitchCount} / 3 (Auto-terminates at 3)</span>
           </div>
         </div>
 
-        {/* Right: Ira Status & End Interview */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Right: Ira Status, Console Toggle, End Interview */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '5px 14px',
+            padding: '5px 12px',
             borderRadius: '20px',
             background: isAiSpeaking ? '#EBF5FB' : isListening ? '#ECFDF5' : '#F8FAFC',
             border: '1px solid #CBD5E1',
@@ -945,20 +949,63 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
 
           <button
             type="button"
+            onClick={() => speakText(aiQuestion)}
+            title="Replay Ira Voice"
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              background: '#F1F5F9',
+              border: '1px solid #CBD5E1',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#334155',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Volume2 size={13} /> Replay
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsIraConsoleExpanded(!isIraConsoleExpanded)}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <MessageSquare size={13} />
+            <span>Ira Discussion</span>
+            {isIraConsoleExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowEndConfirmModal(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '7px 16px',
+              gap: '5px',
+              padding: '6px 14px',
               borderRadius: '6px',
               background: '#DC2626',
               color: '#FFFFFF',
               fontWeight: 700,
-              fontSize: '13px',
+              fontSize: '12px',
               border: 'none',
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)'
+              boxShadow: '0 1px 3px rgba(220, 38, 38, 0.3)'
             }}
           >
             🛑 End Interview
@@ -966,368 +1013,448 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
         </div>
       </div>
 
-      {/* Main Studio: Single-Column for General Questions, Split-Screen for Coding Questions */}
-      <div style={isCodingQuestion ? { display: 'grid', gridTemplateColumns: '1.1fr 1.2fr', gap: '20px' } : { display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Left Column: Ira Card, Question, and Technical Response */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Ira AI Recruiter Card */}
-          <div className="is-card" style={{ padding: '18px 22px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #008BDC, #005F96)',
-                  color: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '20px',
-                  boxShadow: '0 2px 8px rgba(0, 139, 220, 0.3)'
-                }}>
-                  👩‍💼
-                </div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
-                    Ira • MSOT AI Recruiter
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Mirai School of Technology Technical Interview
-                  </div>
-                </div>
-              </div>
+      {/* 2. DOCKED IRA AI RECRUITER DISCUSSION DRAWER */}
+      {isIraConsoleExpanded && (
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '8px',
+          padding: '12px 18px',
+          marginBottom: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>👩‍💼</span>
+              <span style={{ fontWeight: 700, fontSize: '13px', color: '#1E293B' }}>
+                Ira • MSOT AI Recruiter
+              </span>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>
+                (Explain your approach & algorithmic intuition verbally or in text)
+              </span>
+            </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {isAiSpeaking && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <span className="is-wave-bar" style={{ height: '16px' }} />
-                    <span className="is-wave-bar" style={{ height: '16px' }} />
-                    <span className="is-wave-bar" style={{ height: '16px' }} />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => speakText(aiQuestion)}
-                  title="Replay Voice"
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    background: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#334155',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Volume2 size={14} /> Replay
-                </button>
+            {isAiSpeaking && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span className="is-wave-bar" style={{ height: '14px' }} />
+                <span className="is-wave-bar" style={{ height: '14px' }} />
+                <span className="is-wave-bar" style={{ height: '14px' }} />
+              </div>
+            )}
+          </div>
+
+          {/* Current Question / Prompt Text */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '6px',
+            padding: '10px 14px',
+            fontSize: '13px',
+            color: '#334155',
+            lineHeight: 1.5,
+            marginBottom: '10px'
+          }}>
+            {aiQuestion || "Welcome to MSOT Code Arena. Review the technical problem below and explain your approach."}
+          </div>
+
+          {/* Candidate Explanation Input & Controls */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={toggleListening}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '6px',
+                background: isListening ? '#EF4444' : '#008BDC',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+              {isListening ? 'Stop Mic' : 'Speak Answer'}
+            </button>
+
+            <input
+              type="text"
+              value={studentInput}
+              onChange={(e) => setStudentInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleTurnSubmit();
+                }
+              }}
+              placeholder="Type your intuition, time/space complexity, or trade-offs to Ira (Press Enter to Send)..."
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => handleTurnSubmit()}
+              disabled={isSubmitting || !studentInput.trim()}
+              className="is-btn-primary"
+              style={{
+                padding: '8px 16px',
+                fontSize: '12px',
+                flexShrink: 0,
+                borderRadius: '6px'
+              }}
+            >
+              {isSubmitting ? 'Evaluating...' : 'Send to Ira ▶'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. MAIN ARENA: 50 / 50 SPLIT SCREEN MATCHING THE USER'S PHOTO */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px',
+        alignItems: 'stretch',
+        minHeight: '740px'
+      }}>
+        {/* LEFT PANE: PROBLEM STATEMENT (EXACT REPLICA OF THE SCREENSHOT) */}
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #E5E7EB',
+          borderRadius: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+        }}>
+          {/* Subtabs Bar: Description | Editorial | Solutions | Submissions */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 12px',
+            background: '#FAFAFA',
+            borderBottom: '1px solid #E5E7EB',
+            height: '36px'
+          }}>
+            <div style={{ display: 'flex', gap: '16px', height: '100%', alignItems: 'center' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#111827',
+                borderBottom: '2px solid #008BDC',
+                height: '100%',
+                cursor: 'pointer'
+              }}>
+                <FileText size={14} color="#008BDC" />
+                <span>Description</span>
+              </div>
+              <div style={{ fontSize: '13px', color: '#6B7280', cursor: 'pointer' }}>
+                Editorial
+              </div>
+              <div style={{ fontSize: '13px', color: '#6B7280', cursor: 'pointer' }}>
+                Solutions
+              </div>
+              <div style={{ fontSize: '13px', color: '#6B7280', cursor: 'pointer' }}>
+                Submissions
               </div>
             </div>
 
-            {/* Current Question / LeetCode Problem Display */}
-            {isCodingQuestion && codingProblemDetails ? (
-              <div style={{
-                background: '#FFFFFF',
-                border: '1.5px solid #E2E8F0',
-                borderRadius: '10px',
-                padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-              }}>
-                {/* Header: Title, Colorful Difficulty Badge, Tags */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                      {codingProblemDetails.title || 'LeetCode Problem'}
-                    </h3>
-                    <span style={{
-                      padding: '3px 12px',
-                      borderRadius: '14px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      background: codingProblemDetails.level === 'Easy' ? '#E6F9F5' : codingProblemDetails.level === 'Hard' ? '#FFF0F3' : '#FFF8E6',
-                      color: codingProblemDetails.level === 'Easy' ? '#00B8A3' : codingProblemDetails.level === 'Hard' ? '#FF375F' : '#FFA116',
-                      border: `1.5px solid ${codingProblemDetails.level === 'Easy' ? '#A7F3D0' : codingProblemDetails.level === 'Hard' ? '#FECACA' : '#FDE68A'}`
-                    }}>
-                      {codingProblemDetails.level || 'Medium'}
-                    </span>
-                  </div>
+            <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+              MSOT Standard
+            </div>
+          </div>
 
-                  {codingProblemDetails.topic && (
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      background: '#F1F5F9',
-                      color: '#475569',
-                      padding: '4px 12px',
-                      borderRadius: '16px',
-                      border: '1px solid #CBD5E1'
-                    }}>
-                      🏷️ {codingProblemDetails.topic}
-                    </span>
-                  )}
-                </div>
-
-                {/* Problem Statement */}
-                <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#334155', whiteSpace: 'pre-line' }}>
-                  {codingProblemDetails.statement}
-                </div>
-
-                {/* Structured Examples Box */}
-                {codingProblemDetails.examples && (
-                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#008BDC', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Examples
-                    </div>
-                    <div style={{
-                      fontSize: '13px',
-                      lineHeight: 1.6,
-                      fontFamily: 'monospace',
-                      color: '#0F172A',
-                      whiteSpace: 'pre-line',
-                      background: '#FFFFFF',
-                      padding: '12px 14px',
-                      borderRadius: '6px',
-                      border: '1px solid #E2E8F0'
-                    }}>
-                      {codingProblemDetails.examples}
-                    </div>
-                  </div>
-                )}
-
-                {/* Constraints Box */}
-                {codingProblemDetails.constraints && (
-                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '14px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#B45309', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Constraints
-                    </div>
-                    <div style={{ fontSize: '12px', lineHeight: 1.6, color: '#92400E', fontFamily: 'monospace', whiteSpace: 'pre-line' }}>
-                      {codingProblemDetails.constraints}
-                    </div>
-                  </div>
-                )}
+          {/* Problem Body Content (Scrollable) */}
+          <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+            {/* Title & Solved Indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#111827', margin: 0 }}>
+                {problemTitle}
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#10B981', fontWeight: 600 }}>
+                <CheckCircle2 size={14} color="#10B981" />
+                <span>Solved</span>
               </div>
-            ) : (
+            </div>
+
+            {/* Badges Row: Easy (Teal Pill), Topics, Companies, Hint */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <span style={{
+                background: '#E6F9F5',
+                color: '#00B8A3',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '2px 10px',
+                borderRadius: '999px'
+              }}>
+                {problemLevel}
+              </span>
+
+              <span style={{
+                background: '#F3F4F6',
+                color: '#4B5563',
+                fontSize: '12px',
+                fontWeight: 500,
+                padding: '2px 10px',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                🏷️ {problemTopic}
+              </span>
+
+              <span style={{
+                background: '#F3F4F6',
+                color: '#4B5563',
+                fontSize: '12px',
+                fontWeight: 500,
+                padding: '2px 10px',
+                borderRadius: '999px'
+              }}>
+                🏢 Companies
+              </span>
+
+              {/* Single Hint Pill (Interactive: clicking reveals the 1 hint) */}
+              <button
+                type="button"
+                onClick={toggleSingleHint}
+                style={{
+                  background: isHintRevealed ? '#FEF3C7' : '#F3F4F6',
+                  color: isHintRevealed ? '#B45309' : '#4B5563',
+                  border: isHintRevealed ? '1px solid #FDE68A' : 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '2px 10px',
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                💡 Hint {isHintRevealed ? '(Visible)' : ''}
+              </button>
+            </div>
+
+            {/* Single Hint Card (Revealed when clicked) */}
+            {isHintRevealed && (
+              <div style={{
+                background: '#FFFBEB',
+                border: '1px solid #FDE68A',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '18px',
+                fontSize: '13px',
+                color: '#92400E',
+                lineHeight: 1.6
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>💡 Technical Hint:</span>
+                </div>
+                <div>{problemHint}</div>
+              </div>
+            )}
+
+            {/* Problem Statement */}
+            <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#374151', marginBottom: '22px' }}>
+              {selectedDomain === 'dsa' ? (
+                <>
+                  <p style={{ margin: '0 0 12px' }}>
+                    You are given an array of integers <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '13px' }}>nums</code> and an integer <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '13px' }}>target</code>, return indices of the two numbers such that they add up to <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '13px' }}>target</code>.
+                  </p>
+                  <p style={{ margin: '0 0 12px' }}>
+                    You may assume that each input would have <strong>exactly one solution</strong>, and you may not use the same element twice.
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    You can return the answer in any order.
+                  </p>
+                </>
+              ) : (
+                <div style={{ whiteSpace: 'pre-line' }}>{problemStatement}</div>
+              )}
+            </div>
+
+            {/* Example 1 Card */}
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+                Example 1:
+              </div>
               <div style={{
                 background: '#F8FAFC',
                 border: '1px solid #E2E8F0',
                 borderRadius: '8px',
-                padding: '16px',
-                fontSize: '14px',
-                lineHeight: 1.6,
-                color: '#1E293B',
-                whiteSpace: 'pre-wrap'
-              }}>
-                {aiQuestion || "Connecting to Ira..."}
-              </div>
-            )}
-
-            {/* Ask Before Reading Full Problem Interactive Banner */}
-            {shouldAskToRead && (
-              <div style={{
-                marginTop: '14px',
                 padding: '12px 16px',
-                background: '#EFF6FF',
-                border: '1.5px solid #93C5FD',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.06)'
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                color: '#1F2937'
               }}>
-                <div style={{ fontSize: '13px', color: '#1E40AF', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Volume2 size={16} color="#2563EB" />
-                  <span>Ira asks: Would you like the full problem statement and constraints read aloud?</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShouldAskToRead(false);
-                      handleTurnSubmit({ explicitText: "Yes, please read the entire problem statement and constraints aloud." });
-                    }}
-                    style={{
-                      padding: '6px 14px',
-                      background: '#2563EB',
-                      color: '#FFFFFF',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🔊 Yes, Read Aloud
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShouldAskToRead(false);
-                      window.speechSynthesis.cancel();
-                    }}
-                    style={{
-                      padding: '6px 14px',
-                      background: '#FFFFFF',
-                      color: '#1E40AF',
-                      border: '1px solid #93C5FD',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📖 I'll Read It Myself
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Candidate Response Console */}
-          <div className="is-card" style={{ padding: '18px 22px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ fontWeight: 700, fontSize: '14px', color: '#1E293B' }}>
-                Your Technical Response
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={toggleListening}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    background: isListening ? '#EF4444' : '#008BDC',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-                  {isListening ? 'Stop Recording' : 'Speak Answer'}
-                </button>
+                {selectedDomain === 'dsa' ? (
+                  <>
+                    <div><strong>Input:</strong> nums = [2,7,11,15], target = 9</div>
+                    <div><strong>Output:</strong> [0,1]</div>
+                    <div><strong>Explanation:</strong> Because nums[0] + nums[1] == 9, we return [0, 1].</div>
+                  </>
+                ) : (
+                  <>
+                    <div><strong>Input:</strong> t = 50, calls = [{"{"}"t": 50, inputs: [1]{"}"}, {"{"}"t": 75, inputs: [2]{"}"}]</div>
+                    <div><strong>Output:</strong> [{"{"}"t": 125, inputs: [2]{"}"}]</div>
+                    <div><strong>Explanation:</strong> 1st call cancelled because 2nd call triggered at 75ms.</div>
+                  </>
+                )}
               </div>
             </div>
 
-            <textarea
-              value={studentInput}
-              onChange={(e) => setStudentInput(e.target.value)}
-              placeholder={isCodingQuestion 
-                ? "Explain your observations, proposed approach, time/space complexity, or trade-offs here. You can also implement code in the editor on the right." 
-                : "Explain your reasoning and answer clearly here. You can also click 'Speak Answer' to speak naturally."}
-              rows={isCodingQuestion ? 5 : 7}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '14px',
-                lineHeight: 1.5,
-                boxSizing: 'border-box',
-                resize: 'vertical',
-                marginBottom: '14px',
-                fontFamily: 'inherit'
-              }}
-            />
-
-            {/* Actions: Request Hint, End Interview, Submit Answer */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleTurnSubmit({ isHint: true })}
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    background: '#FFFBEB',
-                    border: '1px solid #FDE68A',
-                    color: '#B45309',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <HelpCircle size={14} />
-                  Request Hint {hintsUsed > 0 ? `(${hintsUsed}/4 Used)` : ''}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowEndConfirmModal(true)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    background: '#FEF2F2',
-                    border: '1px solid #FCA5A5',
-                    color: '#DC2626',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  🛑 End Interview
-                </button>
+            {/* Example 2 Card */}
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+                Example 2:
               </div>
+              <div style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                color: '#1F2937'
+              }}>
+                {selectedDomain === 'dsa' ? (
+                  <>
+                    <div><strong>Input:</strong> nums = [3,2,4], target = 6</div>
+                    <div><strong>Output:</strong> [1,2]</div>
+                  </>
+                ) : (
+                  <>
+                    <div><strong>Input:</strong> t = 20, calls = [{"{"}"t": 50, inputs: [1]{"}"}]</div>
+                    <div><strong>Output:</strong> [{"{"}"t": 70, inputs: [1]{"}"}]</div>
+                  </>
+                )}
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => handleTurnSubmit()}
-                disabled={isSubmitting || (!studentInput.trim() && !codeContent.trim())}
-                className="is-btn-primary"
-                style={{ padding: '10px 22px', fontSize: '14px' }}
-              >
-                {isSubmitting ? 'Evaluating...' : 'Submit Answer to Ira ▶'}
-              </button>
+            {/* Example 3 Card */}
+            <div style={{ marginBottom: '22px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+                Example 3:
+              </div>
+              <div style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                color: '#1F2937'
+              }}>
+                {selectedDomain === 'dsa' ? (
+                  <>
+                    <div><strong>Input:</strong> nums = [3,3], target = 6</div>
+                    <div><strong>Output:</strong> [0,1]</div>
+                  </>
+                ) : (
+                  <>
+                    <div><strong>Input:</strong> t = 100, calls = [{"{"}"t": 0, inputs: [4]{"}"}, {"{"}"t": 50, inputs: [5]{"}"}]</div>
+                    <div><strong>Output:</strong> [{"{"}"t": 150, inputs: [5]{"}"}]</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Constraints */}
+            <div style={{ marginBottom: '22px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+                Constraints:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8, color: '#374151', fontFamily: 'monospace' }}>
+                {selectedDomain === 'dsa' ? (
+                  <>
+                    <li>2 &lt;= nums.length &lt;= 10<sup>4</sup></li>
+                    <li>-10<sup>9</sup> &lt;= nums[i] &lt;= 10<sup>9</sup></li>
+                    <li>-10<sup>9</sup> &lt;= target &lt;= 10<sup>9</sup></li>
+                    <li><strong>Only one valid answer exists.</strong></li>
+                  </>
+                ) : (
+                  <>
+                    <li>0 &lt;= t &lt;= 1000</li>
+                    <li>fn returns void or promise</li>
+                    <li>calls is a valid JSON array of objects</li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            {/* Follow-up Section */}
+            <div style={{ marginBottom: '24px', fontSize: '13px', color: '#4B5563', lineHeight: 1.6 }}>
+              <strong>Follow-up:</strong> {selectedDomain === 'dsa' 
+                ? "Can you come up with an algorithm that is less than O(n^2) time complexity?" 
+                : "What is the difference between debounce and throttle, and when would you use throttle for UI scroll listeners instead?"}
+            </div>
+
+            {/* Footer Statistics Bar (Matching screenshot) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingTop: '16px',
+              borderTop: '1px solid #F3F4F6',
+              fontSize: '12px',
+              color: '#6B7280',
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}>
+              <div>
+                Accepted <strong style={{ color: '#111827' }}>23,710,032</strong>/40.8M &nbsp;|&nbsp; Acceptance Rate <strong style={{ color: '#111827' }}>58.0%</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <ThumbsUp size={13} /> 70.6K
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <ThumbsDown size={13} /> 2.1K
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <Star size={13} />
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <Share2 size={13} />
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Code Playground - ONLY VISIBLE FOR CODING QUESTIONS */}
-        {isCodingQuestion && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="is-card" style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Code2 size={16} color="#008BDC" />
-                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#1E293B' }}>
-                    MSOT LeetCode Playground
-                  </span>
-                </div>
-                <span style={{ fontSize: '11px', color: '#64748B' }}>
-                  Standard: {selectedDomain === 'webdev' ? 'JavaScript' : 'C++'}
-                </span>
-              </div>
-
-              <HackerRankCodeEditor
-                subject={selectedDomain}
-                code={codeContent}
-                onChange={(newCode) => setCodeContent(newCode)}
-                onSubmitSolution={(subCode) => {
-                  setCodeContent(subCode);
-                  handleTurnSubmit({ explicitText: "I have implemented and tested my solution in the code editor." });
-                }}
-              />
-            </div>
-          </div>
-        )}
+        {/* RIGHT PANE: LIGHT THEME CODE EDITOR MATCHING PHOTO */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <HackerRankCodeEditor
+            subject={selectedDomain}
+            code={codeContent}
+            onChange={(newCode) => setCodeContent(newCode)}
+            onSubmitSolution={(subCode) => {
+              setCodeContent(subCode);
+              handleTurnSubmit({ explicitText: "I have implemented, tested, and submitted my solution in the code editor." });
+            }}
+          />
+        </div>
       </div>
 
       {/* Top Cursor Exit Warning Banner */}
@@ -1346,11 +1473,11 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
           fontWeight: 700,
           boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
         }}>
-          ⚠️ Proctor Warning: Keep your mouse cursor inside the MSOT Exam Arena! Navigating away or switching tabs is strictly forbidden.
+          ⚠️ Proctor Warning: Keep your mouse cursor inside the MSOT Code Arena! Navigating away or switching tabs is strictly forbidden.
         </div>
       )}
 
-      {/* Strict Anti-Cheating Tab Switch Lockdown Modal */}
+      {/* Strict Tab Switch Lockdown Modal (Auto-Terminates on 3rd Switch) */}
       {isTabLocked && (
         <div style={{
           position: 'fixed',
@@ -1387,71 +1514,121 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             }}>
               🚫
             </div>
-            <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#991B1B', margin: '0 0 10px', letterSpacing: '-0.5px' }}>
-              TAB SWITCHING STRICTLY BLOCKED!
-            </h2>
-            <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 18px' }}>
-              You are taking an active proctored <strong>Mirai School of Technology (MSOT)</strong> AI Interview.
-              Leaving this tab or switching windows is <strong>strictly prohibited</strong> until you officially conclude the interview.
-            </p>
 
-            <div style={{
-              background: '#FEF2F2',
-              border: '1.5px solid #F87171',
-              borderRadius: '8px',
-              padding: '14px',
-              marginBottom: '24px'
-            }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#B91C1C' }}>
-                Proctor Alert: Tab Switch Attempt #{tabSwitchCount} Blocked & Logged
-              </div>
-              <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
-                All departures and blur events are permanently recorded into your official candidate integrity report.
-              </div>
-            </div>
+            {isTerminatedDueToTabs ? (
+              <>
+                <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#991B1B', margin: '0 0 10px' }}>
+                  INTERVIEW TERMINATED & FLAGGED
+                </h2>
+                <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 18px' }}>
+                  You have switched tabs <strong>3 times</strong>. According to MSOT exam policy, your interview session has been permanently <strong>terminated and submitted</strong> for proctor audit.
+                </p>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsTabLocked(false);
-                  window.focus();
-                }}
-                style={{
-                  flex: 1,
-                  padding: '12px 20px',
-                  background: '#DC2626',
-                  color: '#FFFFFF',
+                <div style={{
+                  background: '#FEF2F2',
+                  border: '1.5px solid #F87171',
                   borderRadius: '8px',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(220, 38, 38, 0.4)'
-                }}
-              >
-                Return & Refocus Exam Window
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsTabLocked(false);
-                  handleEndInterview();
-                }}
-                style={{
-                  padding: '12px 18px',
-                  background: '#F1F5F9',
-                  color: '#475569',
+                  padding: '14px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#B91C1C' }}>
+                    Final Disqualification: 3 / 3 Tab Switches Exceeded
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
+                    All integrity events and screen blurs have been recorded in your official candidate evaluation dossier.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTabLocked(false);
+                    setIsScorecardOpen(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    background: '#DC2626',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  View Final Evaluation Scorecard
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#991B1B', margin: '0 0 10px' }}>
+                  TAB SWITCHING STRICTLY BLOCKED!
+                </h2>
+                <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 18px' }}>
+                  You are taking an active proctored <strong>MSOT Code Arena</strong> AI Interview.
+                  Leaving this tab or switching windows is strictly forbidden. <strong>After 3 switches, your interview will be immediately ended!</strong>
+                </p>
+
+                <div style={{
+                  background: '#FEF2F2',
+                  border: '1.5px solid #F87171',
                   borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  border: '1px solid #CBD5E1',
-                  cursor: 'pointer'
-                }}
-              >
-                End Interview Now
-              </button>
-            </div>
+                  padding: '14px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#B91C1C' }}>
+                    Proctor Alert: Tab Switch #{tabSwitchCount} / 3 Blocked & Logged
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
+                    {3 - tabSwitchCount} warning{3 - tabSwitchCount === 1 ? '' : 's'} remaining before automated session termination.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTabLocked(false);
+                      window.focus();
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '12px 20px',
+                      background: '#DC2626',
+                      color: '#FFFFFF',
+                      borderRadius: '8px',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(220, 38, 38, 0.4)'
+                    }}
+                  >
+                    Return & Refocus Arena Window
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTabLocked(false);
+                      handleEndInterview();
+                    }}
+                    style={{
+                      padding: '12px 18px',
+                      background: '#F1F5F9',
+                      color: '#475569',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      border: '1px solid #CBD5E1',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    End Interview Now
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1497,7 +1674,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
               End Technical Interview Now?
             </h3>
             <p style={{ fontSize: '14px', color: '#64748B', lineHeight: 1.6, margin: '0 0 22px' }}>
-              Are you sure you want to end your interview? Ira will immediately finalize your session, compile all answers and code submitted so far, and generate your official <strong>{selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}</strong> evaluation scorecard.
+              Are you sure you want to end your interview? Ira will compile all answers and code submitted so far, and generate your official <strong>{selectedDomain === 'webdev' ? 'Web Development' : 'Data Structures & Algorithms'}</strong> evaluation scorecard.
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button

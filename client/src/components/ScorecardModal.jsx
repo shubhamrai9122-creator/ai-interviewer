@@ -14,6 +14,7 @@ export default function ScorecardModal({
 }) {
   if (!isOpen || !result) return null;
 
+  const evalReport = result.evaluation_report || {};
   const isWebTrack = (subjectTitle || '').toLowerCase().includes('web') || 
                      (evalReport.interview_track === 'webdev');
   const isDsaTrack = !isWebTrack;
@@ -26,7 +27,6 @@ export default function ScorecardModal({
   const dsaScore = Math.round(result.dsa_score || evalReport.dsa_score || score);
   const webScore = Math.round(result.web_dev_score || evalReport.web_dev_score || score);
 
-  const evalReport = result.evaluation_report || {};
   const subscores = result.subscores || (evalReport.subscores || {
     problem_solving: 8.2,
     communication: 8.5,
@@ -40,7 +40,7 @@ export default function ScorecardModal({
   const defaultDsaStrong = [
     'Algorithmic problem decomposition and approach selection',
     'Rigorous Big-O time and space complexity evaluation',
-    'Clean LeetCode-style solution implementation'
+    'Clean and modular solution implementation'
   ];
   const defaultWebStrong = [
     'Practical full-stack web architecture and asynchronous event flows',

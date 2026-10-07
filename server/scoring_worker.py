@@ -193,7 +193,7 @@ class ScoringWorker:
             if problem_solving_10 >= 8.0: strongest_areas.append("Algorithmic problem decomposition and approach selection")
             if complexity_analysis_10 >= 8.0: strongest_areas.append("Rigorous Big-O time and space complexity evaluation")
             if communication_10 >= 8.0: strongest_areas.append("Clear, structured technical communication and rationale defense")
-            if code_quality_10 >= 8.0: strongest_areas.append("Clean LeetCode-style solution implementation and pointer manipulation")
+            if code_quality_10 >= 8.0: strongest_areas.append("Clean modular solution implementation and pointer manipulation")
             if not strongest_areas: strongest_areas.append("Core foundational data structure comprehension")
 
             if complexity_analysis_10 < 7.5: weakest_areas.append("Space complexity and auxiliary memory overhead analysis")

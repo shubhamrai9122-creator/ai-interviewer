@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Send, RotateCcw, CheckCircle2, XCircle, AlertCircle, 
   Terminal, Code2, Sparkles, Copy, Check, ChevronDown, ChevronRight,
-  Cpu, Clock, Layers, Bug, Flame, CheckCheck, RefreshCw
+  Cpu, Clock, Layers, Bug, CheckCheck, RefreshCw, Settings, Sliders
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8000';
@@ -12,15 +12,12 @@ const STARTER_CODES = {
     dsa: `class Solution {
 public:
     vector<int> twoSum(vector<int>& nums, int target) {
-        // Return indices of the two numbers such that they add up to target
         
-        return {};
     }
 };`,
     webdev: `class Solution {
 public:
     int calculateLatency(int requestCount, int networkDelay) {
-        // Return computed server latency in milliseconds
         
         return 0;
     }
@@ -33,9 +30,7 @@ public:
  * @return {number[]}
  */
 var twoSum = function(nums, target) {
-    // Return indices of the two numbers such that they add up to target
     
-    return [];
 };`,
     webdev: `/**
  * @param {Function} fn
@@ -43,8 +38,7 @@ var twoSum = function(nums, target) {
  * @return {Function}
  */
 var debounce = function(fn, t) {
-    // Return a debounced version of that function
-    
+    let timerId = null;
     return function(...args) {
         
     };
@@ -53,26 +47,22 @@ var debounce = function(fn, t) {
   python: {
     dsa: `class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        # Return indices of the two numbers such that they add up to target
         
         return []`,
     webdev: `class Solution:
     def debounce(self, fn, t: int):
-        # Return debounced version of function
         
         pass`
   },
   java: {
     dsa: `class Solution {
     public int[] twoSum(int[] nums, int target) {
-        // Return indices of the two numbers such that they add up to target
         
         return new int[]{};
     }
 }`,
     webdev: `class Solution {
     public int handleRequest(int t) {
-        // Return processed response status code
         
         return 200;
     }
@@ -84,23 +74,32 @@ const DEFAULT_DSA_TEST_CASES = [
   {
     id: 1,
     name: 'Case 1',
+    inputName1: 'nums =',
+    inputValue1: '[2, 7, 11, 15]',
+    inputName2: 'target =',
+    inputValue2: '9',
     input: 'nums = [2, 7, 11, 15], target = 9',
-    expected: '[0, 1]',
-    description: 'Basic standard two-sum pair at front'
+    expected: '[0, 1]'
   },
   {
     id: 2,
     name: 'Case 2',
+    inputName1: 'nums =',
+    inputValue1: '[3, 2, 4]',
+    inputName2: 'target =',
+    inputValue2: '6',
     input: 'nums = [3, 2, 4], target = 6',
-    expected: '[1, 2]',
-    description: 'Elements not located at index 0'
+    expected: '[1, 2]'
   },
   {
     id: 3,
     name: 'Case 3',
+    inputName1: 'nums =',
+    inputValue1: '[3, 3]',
+    inputName2: 'target =',
+    inputValue2: '6',
     input: 'nums = [3, 3], target = 6',
-    expected: '[0, 1]',
-    description: 'Duplicate numbers requiring proper map index overwrite protection'
+    expected: '[0, 1]'
   }
 ];
 
@@ -108,16 +107,22 @@ const DEFAULT_WEB_TEST_CASES = [
   {
     id: 1,
     name: 'Case 1',
+    inputName1: 'calls =',
+    inputValue1: '[{"t": 50, "inputs": [1]}, {"t": 75, "inputs": [2]}]',
+    inputName2: 't =',
+    inputValue2: '50',
     input: 'fn = dispatch, delay = 50ms (rapid 3 burst)',
-    expected: 'PASSED',
-    description: 'Coalesce repeated burst triggers to single execution'
+    expected: 'PASSED'
   },
   {
     id: 2,
     name: 'Case 2',
+    inputName1: 'route =',
+    inputValue1: '"GET /api/status"',
+    inputName2: 'expectedStatus =',
+    inputValue2: '200',
     input: 'GET /api/status -> HTTP 200 OK',
-    expected: 'PASSED',
-    description: 'Asynchronous promise resolve with non-null JSON payload'
+    expected: 'PASSED'
   }
 ];
 
@@ -135,30 +140,30 @@ const highlightSyntax = (rawCode, lang) => {
     return `___TOKEN_${tokens.length - 1}___`;
   };
 
-  // 1. Comments
-  escaped = escaped.replace(/\/\*[\s\S]*?\*\//g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
-  escaped = escaped.replace(/(\/\/[^\n]*)/g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
+  // 1. Comments (green)
+  escaped = escaped.replace(/\/\*[\s\S]*?\*\//g, (m) => saveToken(`<span style="color: #008000; font-style: italic;">${m}</span>`));
+  escaped = escaped.replace(/(\/\/[^\n]*)/g, (m) => saveToken(`<span style="color: #008000; font-style: italic;">${m}</span>`));
   if (lang === 'python') {
-    escaped = escaped.replace(/(#[^\n]*)/g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
+    escaped = escaped.replace(/(#[^\n]*)/g, (m) => saveToken(`<span style="color: #008000; font-style: italic;">${m}</span>`));
   }
 
-  // 2. Strings
-  escaped = escaped.replace(/("(\\"|[^"])*"|'(\\'|[^'])*'|`(\\`|[^`])*`)/g, (m) => saveToken(`<span style="color: #CE9178;">${m}</span>`));
+  // 2. Strings (dark red)
+  escaped = escaped.replace(/("(\\"|[^"])*"|'(\\'|[^'])*'|`(\\`|[^`])*`)/g, (m) => saveToken(`<span style="color: #A31515;">${m}</span>`));
 
-  // 3. Types
-  escaped = escaped.replace(/\b(int|string|vector|bool|boolean|void|float|double|char|long|List|Dict|TreeNode|ListNode|Solution|Array|Object|Function|number|Promise|size_t)\b/g, (m) => `<span style="color: #4EC9B0; font-weight: 600;">${m}</span>`);
+  // 3. Types (teal)
+  escaped = escaped.replace(/\b(int|string|vector|bool|boolean|void|float|double|char|long|List|Dict|TreeNode|ListNode|Solution|Array|Object|Function|number|Promise|size_t)\b/g, (m) => `<span style="color: #267F99; font-weight: 600;">${m}</span>`);
 
-  // 4. Keywords
-  escaped = escaped.replace(/\b(class|public|private|protected|return|var|let|const|function|def|import|from|for|while|if|else|new|this|auto|using|namespace|struct|static|async|await|try|catch|throw|typeof|instanceof|switch|case|break|continue|pass)\b/g, (m) => `<span style="color: #569CD6; font-weight: 600;">${m}</span>`);
+  // 4. Keywords (blue)
+  escaped = escaped.replace(/\b(class|public|private|protected|return|var|let|const|function|def|import|from|for|while|if|else|new|this|auto|using|namespace|struct|static|async|await|try|catch|throw|typeof|instanceof|switch|case|break|continue|pass)\b/g, (m) => `<span style="color: #0000FF; font-weight: 600;">${m}</span>`);
 
-  // 5. Literals
-  escaped = escaped.replace(/\b(true|false|null|nullptr|None|undefined)\b/g, (m) => `<span style="color: #569CD6; font-weight: 600;">${m}</span>`);
+  // 5. Literals (blue)
+  escaped = escaped.replace(/\b(true|false|null|nullptr|None|undefined)\b/g, (m) => `<span style="color: #0000FF; font-weight: 600;">${m}</span>`);
 
-  // 6. Numbers
-  escaped = escaped.replace(/\b(\d+(\.\d+)?)\b/g, (m) => `<span style="color: #B5CEA8;">${m}</span>`);
+  // 6. Numbers (olive green)
+  escaped = escaped.replace(/\b(\d+(\.\d+)?)\b/g, (m) => `<span style="color: #098658;">${m}</span>`);
 
-  // 7. Functions
-  escaped = escaped.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, (m) => `<span style="color: #DCDCAA;">${m}</span>`);
+  // 7. Functions (brown / olive)
+  escaped = escaped.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, (m) => `<span style="color: #795E26;">${m}</span>`);
 
   // 8. Restore tokens
   escaped = escaped.replace(/___TOKEN_(\d+)___/g, (_, idx) => tokens[parseInt(idx, 10)]);
@@ -186,6 +191,8 @@ export default function HackerRankCodeEditor({
   const [runResult, setRunResult] = useState(null);
   const [copied, setCopied] = useState(false);
   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+  
   const textareaRef = useRef(null);
   const highlightRef = useRef(null);
   const gutterRef = useRef(null);
@@ -220,7 +227,7 @@ export default function HackerRankCodeEditor({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Indentation support inside editor
+  // Indentation support & cursor position tracking inside editor
   const handleKeyDown = (e) => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -231,15 +238,30 @@ export default function HackerRankCodeEditor({
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
+          updateCursorPosition(textareaRef.current);
         }
       }, 0);
     }
   };
 
-  // Real LeetCode-style code runner
+  const updateCursorPosition = (el) => {
+    if (!el) return;
+    const textBefore = el.value.substring(0, el.selectionStart);
+    const lines = textBefore.split('\n');
+    const line = lines.length;
+    const col = lines[lines.length - 1].length + 1;
+    setCursorPos({ line, col });
+  };
+
+  const handleSelectOrClick = (e) => {
+    updateCursorPosition(e.target);
+  };
+
+  // Sandboxed code runner
   const handleRunCode = async () => {
     setIsRunning(true);
     setActiveBottomTab('result');
+    setIsDrawerCollapsed(false);
 
     try {
       const res = await fetch(`${API_BASE}/api/code/run`, {
@@ -289,74 +311,74 @@ export default function HackerRankCodeEditor({
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
+      minHeight: '680px',
       width: '100%',
-      background: '#1A1A1A',
-      borderRadius: '12px',
-      border: '1px solid #2D2D2D',
+      background: '#FFFFFF',
+      borderRadius: '8px',
+      border: '1px solid #E5E7EB',
       overflow: 'hidden',
-      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* 1. LeetCode Top Navigation Bar */}
+      {/* 1. Header Toolbar (Light Theme matching photo) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '8px 14px',
-        background: '#262626',
-        borderBottom: '1px solid #333333',
+        padding: '7px 14px',
+        background: '#FAFAFA',
+        borderBottom: '1px solid #E5E7EB',
         gap: '12px',
         flexWrap: 'wrap'
       }}>
-        {/* Left: Language Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Left: </> Code & Language Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '3px 8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderRadius: '4px'
-          }}>
-            <Code2 size={14} color="#FFA116" />
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#E5E5E5' }}>
-              MSOT LeetCode Arena
-            </span>
-          </div>
-
-          <select
-            value={language}
-            onChange={(e) => handleLanguageChange(e.target.value)}
-            style={{
-              background: '#333333',
-              color: '#FFFFFF',
-              border: '1px solid #444444',
-              borderRadius: '5px',
-              padding: '4px 10px',
-              fontFamily: 'var(--mono)',
-              fontSize: '12px',
-              fontWeight: 600,
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="cpp">{subject === 'dsa' ? 'C++ (Standard)' : 'C++'}</option>
-            <option value="javascript">{subject === 'webdev' ? 'JavaScript (Standard)' : 'JavaScript'}</option>
-            <option value="python">Python 3</option>
-            <option value="java">Java</option>
-          </select>
-
-          <span style={{
-            fontSize: '10px',
-            fontFamily: 'var(--mono)',
-            padding: '2px 8px',
-            borderRadius: '999px',
-            background: 'rgba(255, 161, 22, 0.12)',
-            color: '#FFA116',
+            color: '#10B981',
+            fontSize: '13px',
             fontWeight: 700
           }}>
-            {subject === 'dsa' ? 'DSA • C++ Standard' : 'WEB • JS Standard'}
-          </span>
+            <span>&lt;/&gt;</span>
+            <span style={{ color: '#1F2937', fontWeight: 600 }}>Code</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <select
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              style={{
+                background: '#FFFFFF',
+                color: '#1F2937',
+                border: '1px solid #D1D5DB',
+                borderRadius: '5px',
+                padding: '4px 8px',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: '12px',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="cpp">{subject === 'dsa' ? 'C++ (Standard)' : 'C++'}</option>
+              <option value="javascript">{subject === 'webdev' ? 'JavaScript (Standard)' : 'JavaScript'}</option>
+              <option value="python">Python 3</option>
+              <option value="java">Java</option>
+            </select>
+
+            <span style={{
+              fontSize: '11px',
+              color: '#6B7280',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px'
+            }}>
+              ⚙ Auto
+            </span>
+          </div>
         </div>
 
         {/* Right: Actions (Reset, Copy, Run, Submit) */}
@@ -368,17 +390,17 @@ export default function HackerRankCodeEditor({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              padding: '5px 10px',
-              background: '#333333',
-              color: '#D4D4D4',
-              border: '1px solid #444444',
+              padding: '4px 8px',
+              background: '#FFFFFF',
+              color: '#4B5563',
+              border: '1px solid #E5E7EB',
               borderRadius: '5px',
               fontSize: '11px',
               cursor: 'pointer'
             }}
             title="Copy Code"
           >
-            {copied ? <Check size={12} color="#22C55E" /> : <Copy size={12} />}
+            {copied ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
             {copied ? 'Copied' : 'Copy'}
           </button>
 
@@ -389,10 +411,10 @@ export default function HackerRankCodeEditor({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              padding: '5px 10px',
-              background: '#333333',
-              color: '#D4D4D4',
-              border: '1px solid #444444',
+              padding: '4px 8px',
+              background: '#FFFFFF',
+              color: '#4B5563',
+              border: '1px solid #E5E7EB',
               borderRadius: '5px',
               fontSize: '11px',
               cursor: 'pointer'
@@ -403,7 +425,7 @@ export default function HackerRankCodeEditor({
             Reset
           </button>
 
-          {/* LeetCode Run Button (Gray rounded button with Play icon) */}
+          {/* Run Button (Light Gray pill with Play icon) */}
           <button
             type="button"
             onClick={handleRunCode}
@@ -411,31 +433,31 @@ export default function HackerRankCodeEditor({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '5px 14px',
-              background: '#3A3A3A',
-              color: '#FFFFFF',
-              border: '1px solid #4D4D4D',
+              gap: '5px',
+              padding: '4px 14px',
+              background: '#F3F4F6',
+              color: '#374151',
+              border: '1px solid #D1D5DB',
               borderRadius: '5px',
               fontSize: '12px',
               fontWeight: 600,
               cursor: isRunning ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.15s ease'
             }}
           >
-            <Play size={12} color="#22C55E" fill="#22C55E" />
+            <Play size={11} color="#4B5563" fill="#4B5563" />
             {isRunning ? 'Running...' : 'Run'}
           </button>
 
-          {/* LeetCode Submit Button (Green rounded button) */}
+          {/* Submit Button (Bright Green pill) */}
           <button
             type="button"
             onClick={() => onSubmitSolution(code)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '5px 16px',
+              gap: '5px',
+              padding: '4px 16px',
               background: '#2CBB5D',
               color: '#FFFFFF',
               border: 'none',
@@ -443,37 +465,38 @@ export default function HackerRankCodeEditor({
               fontSize: '12px',
               fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(44, 187, 93, 0.3)'
+              boxShadow: '0 1px 3px rgba(44, 187, 93, 0.2)'
             }}
           >
-            <Send size={12} />
+            <Send size={11} />
             Submit
           </button>
         </div>
       </div>
 
-      {/* 2. LeetCode Editor Body (Line Numbers + Colorful Syntax Layer) */}
+      {/* 2. Light Theme Editor Body (Line Numbers + Colorful Syntax Layer) */}
       <div style={{
         flex: 1,
         display: 'flex',
         position: 'relative',
-        background: '#1E1E1E',
-        overflow: 'hidden'
+        background: '#FFFFFF',
+        overflow: 'hidden',
+        minHeight: '340px'
       }}>
         {/* Line Numbers Gutter */}
         <div
           ref={gutterRef}
           style={{
-            width: '46px',
-            padding: '14px 8px 14px 0',
-            background: '#1E1E1E',
-            borderRight: '1px solid #2B2B2B',
+            width: '42px',
+            padding: '12px 6px 12px 0',
+            background: '#FFFFFF',
+            borderRight: '1px solid #F3F4F6',
             textAlign: 'right',
             userSelect: 'none',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
             fontSize: '13px',
             lineHeight: '1.6',
-            color: '#858585',
+            color: '#9CA3AF',
             overflowY: 'hidden'
           }}
         >
@@ -484,7 +507,7 @@ export default function HackerRankCodeEditor({
 
         {/* Code Canvas Container with Syntax Highlight Underlay */}
         <div style={{ position: 'relative', flex: 1, height: '100%', overflow: 'hidden' }}>
-          {/* Syntax Highlighted HTML Underlay */}
+          {/* Syntax Highlighted HTML Underlay (Clean Light Background) */}
           <pre
             ref={highlightRef}
             aria-hidden="true"
@@ -496,16 +519,16 @@ export default function HackerRankCodeEditor({
               right: 0,
               bottom: 0,
               margin: 0,
-              padding: '14px 16px',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              padding: '12px 14px',
+              fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
               fontSize: '13px',
               lineHeight: '1.6',
               whiteSpace: 'pre',
               wordWrap: 'normal',
               pointerEvents: 'none',
               overflow: 'hidden',
-              background: 'transparent',
-              color: '#D4D4D4',
+              background: '#FFFFFF',
+              color: '#1F2937',
               tabSize: 4
             }}
           />
@@ -514,7 +537,12 @@ export default function HackerRankCodeEditor({
           <textarea
             ref={textareaRef}
             value={code}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              onChange(e.target.value);
+              updateCursorPosition(e.target);
+            }}
+            onClick={handleSelectOrClick}
+            onKeyUp={handleSelectOrClick}
             onKeyDown={handleKeyDown}
             onScroll={handleScroll}
             spellCheck={false}
@@ -527,12 +555,12 @@ export default function HackerRankCodeEditor({
               width: '100%',
               height: '100%',
               margin: 0,
-              padding: '14px 16px',
+              padding: '12px 14px',
               boxSizing: 'border-box',
               background: 'transparent',
               color: 'transparent',
-              caretColor: '#38BDF8',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              caretColor: '#1F2937',
+              fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
               fontSize: '13px',
               lineHeight: '1.6',
               border: 'none',
@@ -548,26 +576,43 @@ export default function HackerRankCodeEditor({
         </div>
       </div>
 
-      {/* 3. LeetCode Bottom Testcase & Test Result Panel with Collapsible Drawer */}
+      {/* Editor Footer Status Bar (ln 1, Col 1 & Saved) */}
       <div style={{
-        background: '#262626',
-        borderTop: '1px solid #333333',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '3px 12px',
+        background: '#FAFAFA',
+        borderTop: '1px solid #F3F4F6',
+        fontSize: '11px',
+        color: '#9CA3AF'
+      }}>
+        <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Check size={11} /> Saved
+        </span>
+        <span>ln {cursorPos.line}, Col {cursorPos.col}</span>
+      </div>
+
+      {/* 3. Bottom Testcase & Test Result Panel (Light Theme matching photo) */}
+      <div style={{
+        background: '#FFFFFF',
+        borderTop: '1px solid #E5E7EB',
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: isDrawerCollapsed ? '38px' : '280px',
+        maxHeight: isDrawerCollapsed ? '36px' : '280px',
         transition: 'max-height 0.2s ease',
         overflow: 'hidden'
       }}>
-        {/* Tab Headers: Testcase vs Test Result + Collapse Chevron */}
+        {/* Tab Headers: Testcase vs Test Result */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 12px',
-          background: '#1F1F1F',
-          borderBottom: isDrawerCollapsed ? 'none' : '1px solid #2D2D2D',
-          height: '38px',
-          minHeight: '38px'
+          background: '#FAFAFA',
+          borderBottom: isDrawerCollapsed ? 'none' : '1px solid #E5E7EB',
+          height: '36px',
+          minHeight: '36px'
         }}>
           <div style={{ display: 'flex', gap: '4px', height: '100%' }}>
             <button
@@ -582,14 +627,15 @@ export default function HackerRankCodeEditor({
                 gap: '6px',
                 padding: '0 12px',
                 background: 'transparent',
-                color: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? '#FFFFFF' : '#888888',
+                color: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? '#111827' : '#6B7280',
                 border: 'none',
                 borderBottom: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? '2px solid #FFA116' : '2px solid transparent',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: (!isDrawerCollapsed && activeBottomTab === 'testcase') ? 700 : 500,
                 cursor: 'pointer'
               }}
             >
+              <CheckCircle2 size={13} color={(!isDrawerCollapsed && activeBottomTab === 'testcase') ? '#10B981' : '#9CA3AF'} />
               <span>Testcase</span>
             </button>
 
@@ -605,15 +651,15 @@ export default function HackerRankCodeEditor({
                 gap: '6px',
                 padding: '0 12px',
                 background: 'transparent',
-                color: (!isDrawerCollapsed && activeBottomTab === 'result') ? '#FFFFFF' : '#888888',
+                color: (!isDrawerCollapsed && activeBottomTab === 'result') ? '#111827' : '#6B7280',
                 border: 'none',
                 borderBottom: (!isDrawerCollapsed && activeBottomTab === 'result') ? '2px solid #FFA116' : '2px solid transparent',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: (!isDrawerCollapsed && activeBottomTab === 'result') ? 700 : 500,
                 cursor: 'pointer'
               }}
             >
-              <span>Test Result</span>
+              <span>&gt;_ Test Result</span>
               {runResult && (
                 <span style={{
                   width: '7px',
@@ -626,31 +672,28 @@ export default function HackerRankCodeEditor({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Quick status pill when result is available */}
             {runResult && !isDrawerCollapsed && activeBottomTab === 'result' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: runResult.status === 'Accepted' ? '#22C55E' : '#EF4444',
-                  fontFamily: 'var(--mono)'
+                  color: runResult.status === 'Accepted' ? '#16A34A' : '#DC2626'
                 }}>
                   {runResult.status}
                 </span>
-                <span style={{ fontSize: '11px', color: '#888888', fontFamily: 'var(--mono)' }}>
+                <span style={{ fontSize: '11px', color: '#6B7280' }}>
                   {runResult.runtime_ms} ms
                 </span>
               </div>
             )}
 
-            {/* Collapse/Expand Drawer Toggle Button */}
             <button
               type="button"
               onClick={() => setIsDrawerCollapsed(!isDrawerCollapsed)}
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#A0A0A0',
+                color: '#6B7280',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -658,19 +701,18 @@ export default function HackerRankCodeEditor({
                 fontSize: '11px',
                 padding: '4px 6px'
               }}
-              title={isDrawerCollapsed ? "Expand Testcase Panel" : "Collapse Testcase Panel to enlarge code"}
+              title={isDrawerCollapsed ? "Expand Testcase Panel" : "Collapse Testcase Panel"}
             >
-              <span>{isDrawerCollapsed ? 'Expand Testcases' : 'Collapse'}</span>
-              {isDrawerCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span>{isDrawerCollapsed ? 'Expand' : 'Collapse'}</span>
+              {isDrawerCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             </button>
           </div>
         </div>
 
-        {/* Tab 1: Testcase Panel (Case 1, Case 2, Case 3 pills like LeetCode) */}
+        {/* Tab 1: Testcase Panel (Case 1, Case 2, Case 3 pills matching photo) */}
         {!isDrawerCollapsed && activeBottomTab === 'testcase' && (
-          <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
-            {/* Case selector pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <div style={{ padding: '12px 16px', overflowY: 'auto', background: '#FFFFFF' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               {testCases.map((tc, idx) => (
                 <button
                   key={tc.id}
@@ -682,10 +724,10 @@ export default function HackerRankCodeEditor({
                   style={{
                     padding: '4px 12px',
                     borderRadius: '5px',
-                    background: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#383838' : '#2A2A2A',
-                    color: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#FFFFFF' : '#8A8A8A',
+                    background: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#E5E7EB' : '#F3F4F6',
+                    color: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#111827' : '#4B5563',
                     border: '1px solid',
-                    borderColor: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#555555' : 'transparent',
+                    borderColor: (!isCustomInputMode && selectedTestCaseIndex === idx) ? '#D1D5DB' : '#E5E7EB',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer'
@@ -701,10 +743,10 @@ export default function HackerRankCodeEditor({
                 style={{
                   padding: '4px 12px',
                   borderRadius: '5px',
-                  background: isCustomInputMode ? '#383838' : '#2A2A2A',
-                  color: isCustomInputMode ? '#FFFFFF' : '#8A8A8A',
+                  background: isCustomInputMode ? '#E5E7EB' : '#F3F4F6',
+                  color: isCustomInputMode ? '#111827' : '#4B5563',
                   border: '1px solid',
-                  borderColor: isCustomInputMode ? '#FFA116' : 'transparent',
+                  borderColor: isCustomInputMode ? '#FFA116' : '#E5E7EB',
                   fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer'
@@ -714,62 +756,64 @@ export default function HackerRankCodeEditor({
               </button>
             </div>
 
-            {/* Test Case Details */}
             {!isCustomInputMode ? (
-              <div>
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px', fontFamily: 'var(--mono)' }}>
-                    Input Parameters:
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', fontFamily: 'monospace' }}>
+                    {activeTestCase.inputName1 || 'Input:'}
                   </div>
                   <div style={{
-                    background: '#1F1F1F',
-                    border: '1px solid #333333',
+                    background: '#F9FAFB',
+                    border: '1px solid #E5E7EB',
                     borderRadius: '6px',
-                    padding: '8px 12px',
+                    padding: '6px 12px',
                     fontSize: '12px',
-                    fontFamily: 'var(--mono)',
-                    color: '#E5E5E5'
+                    fontFamily: 'monospace',
+                    color: '#1F2937'
                   }}>
-                    {activeTestCase.input}
+                    {activeTestCase.inputValue1 || activeTestCase.input}
                   </div>
                 </div>
 
-                <div>
-                  <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px', fontFamily: 'var(--mono)' }}>
-                    Expected Output:
+                {activeTestCase.inputName2 && (
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', fontFamily: 'monospace' }}>
+                      {activeTestCase.inputName2}
+                    </div>
+                    <div style={{
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      color: '#1F2937'
+                    }}>
+                      {activeTestCase.inputValue2}
+                    </div>
                   </div>
-                  <div style={{
-                    background: '#1F1F1F',
-                    border: '1px solid #333333',
-                    borderRadius: '6px',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    fontFamily: 'var(--mono)',
-                    color: '#22C55E'
-                  }}>
-                    {activeTestCase.expected}
-                  </div>
-                </div>
+                )}
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px', fontFamily: 'var(--mono)' }}>
-                  Custom Input (passed directly to process stdin):
+                <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', fontFamily: 'monospace' }}>
+                  Custom Input (passed directly to sandbox runner):
                 </div>
                 <input
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
-                  placeholder="e.g. [3, 2, 4], 6"
+                  placeholder="e.g. nums = [3, 2, 4], target = 6"
                   style={{
                     width: '100%',
-                    background: '#1F1F1F',
-                    border: '1px solid #444444',
+                    background: '#F9FAFB',
+                    border: '1px solid #D1D5DB',
                     borderRadius: '6px',
                     padding: '8px 12px',
                     fontSize: '12px',
-                    fontFamily: 'var(--mono)',
-                    color: '#FFFFFF',
-                    outline: 'none'
+                    fontFamily: 'monospace',
+                    color: '#1F2937',
+                    outline: 'none',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
@@ -777,48 +821,46 @@ export default function HackerRankCodeEditor({
           </div>
         )}
 
-        {/* Tab 2: LeetCode Test Result Panel */}
+        {/* Tab 2: Test Result Panel (Light Theme) */}
         {!isDrawerCollapsed && activeBottomTab === 'result' && (
-          <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
+          <div style={{ padding: '12px 16px', overflowY: 'auto', background: '#FFFFFF' }}>
             {runResult ? (
               <div>
-                {/* Result Status Banner */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                   <div style={{
-                    fontSize: '18px',
+                    fontSize: '16px',
                     fontWeight: 800,
-                    color: runResult.status === 'Accepted' ? '#2CBB5D' : '#EF4444'
+                    color: runResult.status === 'Accepted' ? '#16A34A' : '#DC2626'
                   }}>
                     {runResult.status}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#888888' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: '#6B7280' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={13} color="#888888" />
-                      <span>Runtime: <strong style={{ color: '#D4D4D4' }}>{runResult.runtime_ms} ms</strong></span>
+                      <Clock size={12} color="#6B7280" />
+                      <span>Runtime: <strong style={{ color: '#1F2937' }}>{runResult.runtime_ms} ms</strong></span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Cpu size={13} color="#888888" />
-                      <span>Memory: <strong style={{ color: '#D4D4D4' }}>{runResult.memory_mb} MB</strong></span>
+                      <Cpu size={12} color="#6B7280" />
+                      <span>Memory: <strong style={{ color: '#1F2937' }}>{runResult.memory_mb} MB</strong></span>
                     </div>
                   </div>
                 </div>
 
-                {/* Stdout / Stderr logs */}
                 {runResult.stderr && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: 700, marginBottom: '4px' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: 700, marginBottom: '4px' }}>
                       Compile / Runtime Error:
                     </div>
                     <pre style={{
                       margin: 0,
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: '#FEF2F2',
+                      border: '1px solid #FECACA',
                       borderRadius: '6px',
                       padding: '8px 12px',
-                      color: '#FCA5A5',
-                      fontFamily: 'var(--mono)',
+                      color: '#991B1B',
+                      fontFamily: 'monospace',
                       fontSize: '11px',
                       whiteSpace: 'pre-wrap'
                     }}>
@@ -828,19 +870,19 @@ export default function HackerRankCodeEditor({
                 )}
 
                 {runResult.stdout && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px', fontFamily: 'var(--mono)' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', fontFamily: 'monospace' }}>
                       Stdout:
                     </div>
                     <pre style={{
                       margin: 0,
-                      background: '#1F1F1F',
-                      border: '1px solid #333333',
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
                       borderRadius: '6px',
                       padding: '8px 12px',
-                      color: '#E5E5E5',
-                      fontFamily: 'var(--mono)',
-                      fontSize: '12px',
+                      color: '#1F2937',
+                      fontFamily: 'monospace',
+                      fontSize: '11px',
                       whiteSpace: 'pre-wrap'
                     }}>
                       {runResult.stdout}
@@ -848,7 +890,6 @@ export default function HackerRankCodeEditor({
                   </div>
                 )}
 
-                {/* Case Breakdown */}
                 {runResult.test_results && runResult.test_results.length > 0 && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                     {runResult.test_results.map((tr) => (
@@ -856,20 +897,20 @@ export default function HackerRankCodeEditor({
                         key={tr.case_num}
                         style={{
                           flex: 1,
-                          background: '#1F1F1F',
-                          border: `1px solid ${tr.passed ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                          background: tr.passed ? '#F0FDF4' : '#FEF2F2',
+                          border: `1px solid ${tr.passed ? '#BBF7D0' : '#FECACA'}`,
                           borderRadius: '6px',
                           padding: '8px 10px',
                           fontSize: '11px'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 700 }}>
-                          <span style={{ color: '#FFFFFF' }}>Case {tr.case_num}</span>
-                          <span style={{ color: tr.passed ? '#22C55E' : '#EF4444' }}>
+                          <span style={{ color: '#1F2937' }}>Case {tr.case_num}</span>
+                          <span style={{ color: tr.passed ? '#16A34A' : '#DC2626' }}>
                             {tr.passed ? '✔ Passed' : '✖ Failed'}
                           </span>
                         </div>
-                        <div style={{ color: '#888888', fontFamily: 'var(--mono)', fontSize: '10px' }}>
+                        <div style={{ color: '#6B7280', fontFamily: 'monospace', fontSize: '10px' }}>
                           Output: {tr.actual || 'None'}
                         </div>
                       </div>
@@ -878,8 +919,8 @@ export default function HackerRankCodeEditor({
                 )}
               </div>
             ) : (
-              <div style={{ color: '#777777', fontSize: '12px', textAlign: 'center', padding: '18px 0' }}>
-                You must run your code first to view LeetCode evaluation results.
+              <div style={{ color: '#9CA3AF', fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>
+                You must run your code first to view sandbox evaluation results.
               </div>
             )}
           </div>

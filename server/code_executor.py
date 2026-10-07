@@ -1,5 +1,5 @@
 """
-LeetCode-Style Sandboxed Code Execution Engine
+MSOT Code Arena Sandboxed Code Execution Engine
 Supports JavaScript (Node.js), Python 3, C++ (g++), and Java.
 Executes code with input parameters, captures stdout, runtime (ms), memory (MB),
 and evaluates against test cases (Accepted, Wrong Answer, Runtime Error, Time Limit Exceeded).
@@ -16,7 +16,7 @@ TIMEOUT_SECONDS = 5.0
 
 def run_code_sandbox(code: str, language: str, test_cases: List[Dict[str, Any]] = None, custom_input: str = None) -> Dict[str, Any]:
     """
-    Executes candidate code in a sandbox with custom input or pre-configured LeetCode test cases.
+    Executes candidate code in a sandbox with custom input or pre-configured test cases.
     """
     if not test_cases:
         test_cases = []

@@ -59,7 +59,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               borderRadius: '4px',
               border: '1px solid #BAE0F7'
             }}>
-              Mirai School of Technology AI Interviewer
+              MSOT Code Arena
             </span>
             <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
               Powered by <strong style={{ color: '#008BDC' }}>Ira • MSOT AI Recruiter</strong>
@@ -67,7 +67,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           </div>
         </div>
 
-        {/* Navigation Tabs (Student View: Mock Interview & Evaluation Reports) */}
+        {/* Navigation Tabs (Student View: MSOT Code Arena & Evaluation Reports) */}
         <nav style={{
           display: 'flex',
           gap: '4px',
@@ -94,7 +94,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
             }}
           >
             <Mic size={15} color={activeTab === 'interview' ? '#FFFFFF' : '#64748B'} />
-            Mock Interview Room
+            MSOT Code Arena
           </button>
 
           <button

@@ -18,8 +18,8 @@ Module 2: Dynamic Programming Mastery
 - DP on Subsequences: 0/1 Knapsack, Coin Change (Infinite Supply), Target Sum
 - DP on Strings: Longest Common Subsequence (LCS), Edit Distance`
   },
-  dsa_leetcode75: {
-    title: "LeetCode 75 Core Patterns (Sliding Window & Trees)",
+  dsa_core_patterns: {
+    title: "Core 75 Algorithmic Patterns (Sliding Window & Trees)",
     subject: "Data Structures & Algorithms",
     role: "SDE Intern",
     text: `Topic 1: Two Pointers & Sliding Window
@@ -306,20 +306,20 @@ export default function SyllabusTrainingLab({ onLaunchInterview }) {
               </button>
               <button
                 type="button"
-                onClick={() => handleApplyPreset('dsa_leetcode75')}
+                onClick={() => handleApplyPreset('dsa_core_patterns')}
                 style={{
                   padding: '8px 10px',
                   borderRadius: '6px',
-                  border: selectedPreset === 'dsa_leetcode75' ? '1.5px solid #008BDC' : '1px solid #E2E8F0',
-                  background: selectedPreset === 'dsa_leetcode75' ? '#EBF5FB' : '#F8FAFC',
+                  border: selectedPreset === 'dsa_core_patterns' ? '1.5px solid #008BDC' : '1px solid #E2E8F0',
+                  background: selectedPreset === 'dsa_core_patterns' ? '#EBF5FB' : '#F8FAFC',
                   fontSize: '12px',
                   fontWeight: 600,
                   textAlign: 'left',
-                  color: selectedPreset === 'dsa_leetcode75' ? '#008BDC' : '#334155',
+                  color: selectedPreset === 'dsa_core_patterns' ? '#008BDC' : '#334155',
                   cursor: 'pointer'
                 }}
               >
-                ⚡ LeetCode 75 Patterns
+                ⚡ Core 75 Patterns
               </button>
               <button
                 type="button"

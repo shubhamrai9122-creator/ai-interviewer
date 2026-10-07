@@ -43,13 +43,13 @@ HINGLISH_TRANSLATION_MAP = {
     "aakhri element": "last element"
 }
 
-# Curated LeetCode Problems (Strictly LeetCode + Admin/Custom Only)
-LEETCODE_PROBLEMS = {
+# Curated Technical Coding Problems (MSOT Code Arena Standards)
+ARENA_PROBLEMS = {
     "two_sum": {
-        "id": "leetcode_1_two_sum",
-        "source_type": "LEETCODE",
+        "id": "msot_1_two_sum",
+        "source_type": "MSOT_STANDARD",
         "number": 1,
-        "title": "LeetCode #1: Two Sum",
+        "title": "1. Two Sum",
         "level": "Easy",
         "topic": "Arrays & Hash Table",
         "statement": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nYou can return the answer in any order.",
@@ -61,7 +61,6 @@ LEETCODE_PROBLEMS = {
         "starter_code_cpp": """class Solution {
 public:
     vector<int> twoSum(vector<int>& nums, int target) {
-        // Return indices of the two numbers that add up to target
         
         return {};
     }
@@ -73,24 +72,20 @@ public:
  * @return {number[]}
  */
 var twoSum = function(nums, target) {
-    // Return indices of the two numbers that add up to target
     
     return [];
 };
 """,
         "hints": [
-            "Think about what information you need to look up for each number as you iterate through the array.",
-            "Consider whether a hash table (unordered_map in C++) can help you look up the required complement (target - current_num) in average O(1) time.",
-            "As you traverse each element at index i, check if (target - nums[i]) is already in your hash map. If so, return {map[target - nums[i]], i}. Otherwise insert nums[i] -> i.",
-            "Initialize unordered_map<int, int> seen. For i from 0 to n-1: int complement = target - nums[i]; if (seen.count(complement)) return {seen[complement], i}; seen[nums[i]] = i; return {}."
+            "Use an unordered_map (hash table) to store each number and its index. As you iterate through nums, check if the complement (target - nums[i]) already exists in the map in average O(1) time."
         ],
-        "follow_up_sorted": "What if the input array is already sorted in ascending order? How would you solve this in O(1) auxiliary space without extra memory?"
+        "follow_up_sorted": "Can you come up with an algorithm that is less than O(n^2) time complexity?"
     },
     "reverse_linked_list": {
-        "id": "leetcode_206_reverse_linked_list",
-        "source_type": "LEETCODE",
+        "id": "msot_206_reverse_linked_list",
+        "source_type": "MSOT_STANDARD",
         "number": 206,
-        "title": "LeetCode #206: Reverse Linked List",
+        "title": "206. Reverse Linked List",
         "level": "Easy",
         "topic": "Linked List",
         "statement": "Given the head of a singly linked list, reverse the list, and return the reversed list.",
@@ -112,7 +107,6 @@ var twoSum = function(nums, target) {
 class Solution {
 public:
     ListNode* reverseList(ListNode* head) {
-        // Reverse singly linked list and return new head
         
         return nullptr;
     }
@@ -128,24 +122,20 @@ public:
  * @return {ListNode}
  */
 var reverseList = function(head) {
-    // Reverse singly linked list and return new head
     
     return null;
 };
 """,
         "hints": [
-            "Think about manipulating pointers iteratively: at each node, what needs to point where?",
-            "Maintain three pointers: prev (initially nullptr), curr (initially head), and next_node.",
-            "In each step, save curr->next to next_node, point curr->next = prev, move prev = curr, and curr = next_node.",
-            "Loop while (curr != nullptr): ListNode* nxt = curr->next; curr->next = prev; prev = curr; curr = nxt; Return prev."
+            "Maintain three pointers: prev = nullptr, curr = head, and next. In each step, point curr->next = prev, move prev = curr, and advance curr = next."
         ],
         "follow_up_sorted": "Can you reverse the linked list recursively and explain the difference in call stack space complexity?"
     },
     "longest_substring": {
-        "id": "leetcode_3_longest_substring",
-        "source_type": "LEETCODE",
+        "id": "msot_3_longest_substring",
+        "source_type": "MSOT_STANDARD",
         "number": 3,
-        "title": "LeetCode #3: Longest Substring Without Repeating Characters",
+        "title": "3. Longest Substring Without Repeating Characters",
         "level": "Medium",
         "topic": "Sliding Window & Hash Set",
         "statement": "Given a string s, find the length of the longest substring without repeating characters.",
@@ -157,7 +147,6 @@ var reverseList = function(head) {
         "starter_code_cpp": """class Solution {
 public:
     int lengthOfLongestSubstring(string s) {
-        // Return length of longest substring without repeating characters
         
         return 0;
     }
@@ -168,24 +157,20 @@ public:
  * @return {number}
  */
 var lengthOfLongestSubstring = function(s) {
-    // Return length of longest substring without repeating characters
     
     return 0;
 };
 """,
         "hints": [
-            "Think about maintaining a contiguous window of characters as you scan through the string from left to right.",
-            "Can you use the Two Pointers or Sliding Window pattern with a hash map to record the last seen index of each character?",
-            "When a duplicate character is seen at index right, move left = max(left, last_seen[char] + 1).",
-            "Initialize unordered_map<char, int> seen, max_len = 0, left = 0. For right from 0 to s.length()-1: if char in seen, left = max(left, seen[char] + 1); seen[char] = right; max_len = max(max_len, right - left + 1); Return max_len."
+            "Use the Sliding Window pattern with an unordered_map storing character indices to slide your left window pointer past duplicate characters in O(N) time."
         ],
         "follow_up_sorted": "How would you optimize this if the character set is strictly 26 lowercase English letters or ASCII?"
     },
     "debounce": {
-        "id": "leetcode_2627_debounce",
-        "source_type": "LEETCODE",
+        "id": "msot_2627_debounce",
+        "source_type": "MSOT_STANDARD",
         "number": 2627,
-        "title": "LeetCode #2627: Debounce Async Dispatcher",
+        "title": "2627. Debounce",
         "level": "Medium",
         "topic": "JavaScript Event Loop & Closures",
         "statement": "Given a function fn and a time in milliseconds t, return a debounced version of that function.\n\nA debounced function is a function whose execution is delayed by t milliseconds and whose execution is cancelled if it is called again within that window of time. The debounced function should also receive the passed parameters.",
@@ -202,17 +187,11 @@ var lengthOfLongestSubstring = function(s) {
 var debounce = function(fn, t) {
     let timerId = null;
     return function(...args) {
-        // Return debounced function execution
         
     };
 };
 """,
-        "starter_code_cpp": """#include <iostream>
-#include <chrono>
-#include <functional>
-using namespace std;
-
-class DebounceWorker {
+        "starter_code_cpp": """class DebounceWorker {
 public:
     void dispatch(int delayMs, function<void()> fn) {
         // C++ Async Debounced Worker
@@ -220,10 +199,7 @@ public:
 };
 """,
         "hints": [
-            "Use a closure to keep track of a timerId variable across repeated invocations.",
-            "Each time the returned wrapper function is called, immediately invoke clearTimeout(timerId).",
-            "Then set timerId = setTimeout(() => fn(...args), t) so only the final call in the burst executes.",
-            "let timer; return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), t); };"
+            "Maintain a timerId variable in a closure. On every call, clearTimeout(timerId) and reset timerId = setTimeout(() => fn(...args), t) so only the final burst call triggers."
         ],
         "follow_up_sorted": "What is the difference between debounce and throttle, and when would you use throttle for UI scroll listeners instead?"
     }
@@ -415,15 +391,13 @@ class VivaEngine:
             )
 
     def _format_coding_problem(self, problem: Dict[str, Any]) -> str:
-        """Formats coding problem for the LeetCode box display."""
-        source_badge = f"📋 **[From Candidate's Uploaded Syllabus: {problem.get('syllabus_title')}]**\n\n" if problem.get("syllabus_title") else f"🏷️ **[{problem.get('title', 'LeetCode Problem')}]** • Difficulty: **{problem.get('level', 'Medium')}**\n\n"
+        """Formats coding problem for display."""
         return (
-            f"{source_badge}**Problem Statement:**\n{problem['statement']}\n\n"
-            f"**Input Description:**\n{problem['input_desc']}\n\n"
-            f"**Output Description:**\n{problem['output_desc']}\n\n"
+            f"**{problem.get('title', 'Problem')}** • Difficulty: **{problem.get('level', 'Medium')}**\n\n"
+            f"**Problem Statement:**\n{problem['statement']}\n\n"
             f"**Constraints:**\n{problem['constraints']}\n\n"
             f"**Examples:**\n{problem['examples']}\n\n"
-            "Take a moment to review this. Please explain your observations, approach, and Big-O complexity before coding."
+            "Review the statement and test cases on your screen. Explain your proposed approach and Big-O complexity, then implement your solution."
         )
 
     def select_next_turn(
@@ -436,19 +410,18 @@ class VivaEngine:
         is_hint_req: bool
     ) -> Tuple[str, str, bool, bool, Optional[Dict[str, Any]], Optional[int], QuestionType, Dict[str, Any]]:
         """
-        Stateful, adaptive interviewer logic following MSOT & LeetCode specifications.
-        Returns:
-        (ai_response_text, audio_spoken_text, is_coding_question, should_ask_to_read, coding_problem_details, next_qid, next_qtype, updated_profile)
+        Direct problem solving and evaluation logic in MSOT Code Arena.
+        Starts directly with coding problem analysis (no introductory questions).
+        Provides exactly 1 hint upon request.
         """
         profile = session.interview_profile or {}
         q_count = len(session.questions_asked)
         lowered_input = student_transcript.lower()
 
-        stage = profile.get("stage", "INTRO")
+        stage = profile.get("stage", "CODING_APPROACH_DISCUSSION")
         preferred_domain = profile.get("preferred_domain", session.preferred_domain or "dsa")
-        level = profile.get("level", session.interview_level or "Intermediate")
+        level = "Standard"
         hints_used = profile.get("hints_used", 0)
-        hint_level = profile.get("hint_level", 0)
         characteristics = profile.get("characteristics", {
             "asks_clarifying_questions": False,
             "identifies_core_pattern": False,
@@ -485,7 +458,7 @@ class VivaEngine:
 
         profile["characteristics"] = characteristics
 
-        # Determine chosen LeetCode or Custom Syllabus Problem
+        # Determine chosen Problem
         custom_syllabus = None
         if hasattr(session, "active_syllabus_id") and session.active_syllabus_id:
             custom_syllabus = self.db.query(TrainedSyllabus).filter(TrainedSyllabus.id == session.active_syllabus_id).first()
@@ -496,12 +469,11 @@ class VivaEngine:
                 TrainedSyllabus.subject == target_sub
             ).order_by(TrainedSyllabus.created_at.desc()).first()
 
-        # Pick base LeetCode problem
         if preferred_domain == "webdev":
             prob_key = "debounce"
         else:
-            prob_key = "two_sum" if level.lower() == "beginner" else ("longest_substring" if level.lower() == "intermediate" else "two_sum")
-        problem = LEETCODE_PROBLEMS.get(prob_key, LEETCODE_PROBLEMS["two_sum"])
+            prob_key = "two_sum"
+        problem = ARENA_PROBLEMS.get(prob_key, ARENA_PROBLEMS["two_sum"])
 
         if custom_syllabus and custom_syllabus.generated_questions:
             q_idx = profile.get("custom_q_idx", 0) % len(custom_syllabus.generated_questions)
@@ -510,7 +482,7 @@ class VivaEngine:
                 "id": f"custom_{custom_syllabus.id}_{q_idx}",
                 "source_type": "ADMIN_CUSTOM",
                 "title": custom_q.get("title", problem["title"]),
-                "level": custom_q.get("level", level),
+                "level": custom_q.get("level", "Medium"),
                 "statement": custom_q.get("statement", problem["statement"]),
                 "input_desc": custom_q.get("input_desc", problem["input_desc"]),
                 "output_desc": custom_q.get("output_desc", problem["output_desc"]),
@@ -529,134 +501,70 @@ class VivaEngine:
             return (
                 "Let's stay focused on our technical interview. Could you explain the time and space complexity of the approach you were discussing?",
                 "Let's stay focused on our technical interview. Could you explain the time and space complexity of the approach you were discussing?",
-                False, False, None, None, QuestionType.CONCEPT, profile
+                True, False, problem, None, QuestionType.CONCEPT, profile
             )
 
-        # 2. Handle Progressive Hints
+        # 2. Handle Single-Level Hint
         if is_hint_req or ("hint" in lowered_input and len(student_transcript.split()) < 10):
-            hint_level = min(4, hint_level + 1)
-            hints_used += 1
-            profile["hints_used"] = hints_used
-            profile["hint_level"] = hint_level
-            hint_text = problem["hints"][hint_level - 1]
-            hint_msg = f"[Hint Level {hint_level}]: {hint_text}\n\nHow does this guide your line of thinking?"
-            return (hint_msg, hint_msg, stage.startswith("CODING"), False, problem if stage.startswith("CODING") else None, None, QuestionType.WHY, profile)
+            profile["hints_used"] = 1
+            hint_text = problem["hints"][0] if problem.get("hints") else "Consider how a hash map allows looking up required complements in O(1) time."
+            hint_msg = f"💡 [Hint]: {hint_text}\n\nHow does this guide your line of thinking?"
+            return (hint_msg, hint_msg, True, False, problem, None, QuestionType.WHY, profile)
 
         # 3. Handle 'I don't know' / giving up
         if is_giveup or "i don't know" in lowered_input or "no idea" in lowered_input:
-            if hint_level < 2:
-                hint_level = 1
-                hints_used += 1
-                profile["hints_used"] = hints_used
-                profile["hint_level"] = hint_level
-                h_msg = f"That's completely fine. Let's break it down together with a small direction: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?"
-                return (h_msg, h_msg, stage.startswith("CODING"), False, problem if stage.startswith("CODING") else None, None, QuestionType.CONCEPT, profile)
+            profile["hints_used"] = 1
+            h_msg = f"That's completely fine. Here is a hint to guide you: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?"
+            return (h_msg, h_msg, True, False, problem, None, QuestionType.CONCEPT, profile)
 
-        # STAGE 0: Introduction & Setup
-        if q_count == 0 or stage in ["INTRO", "WARMUP"]:
-            if "web" in lowered_input:
-                preferred_domain = "webdev"
-            elif "dsa" in lowered_input or "data structure" in lowered_input or "algorithm" in lowered_input:
-                preferred_domain = "dsa"
-
-            if "beginner" in lowered_input: level = "Beginner"
-            elif "advanced" in lowered_input: level = "Advanced"
-            elif "intermediate" in lowered_input: level = "Intermediate"
-
-            profile["preferred_domain"] = preferred_domain
-            profile["level"] = level
-            profile["stage"] = "GENERAL_CONCEPT_1"
-            session.preferred_domain = preferred_domain
-            session.interview_level = level
-
-            # Question 1: General foundational question (Spoken aloud, NO code editor)
-            if preferred_domain == "webdev":
-                q1 = "Thank you for the introduction! Let's start with a foundational general question: How does the JavaScript Event Loop coordinate synchronous execution, Promise microtasks, and timer macrotasks?"
-            else:
-                q1 = "Thank you for the introduction! Let's start with a foundational general question: What are the fundamental differences between an Array and a Linked List in memory allocation and cache locality, and how do their insertion and lookup complexities compare?"
-
-            return (q1, q1, False, False, None, None, QuestionType.CONCEPT, profile)
-
-        # STAGE 1: Continuous Socratic General Follow-up 1
-        if stage == "GENERAL_CONCEPT_1":
-            profile["stage"] = "GENERAL_CONCEPT_2"
-            continuous_q = self.generate_continuous_followup(student_transcript, preferred_domain)
-            return (continuous_q, continuous_q, False, False, None, None, QuestionType.WHY, profile)
-
-        # STAGE 2: Continuous Socratic General Follow-up 2 -> Transition to LeetCode Coding Problem
-        if stage == "GENERAL_CONCEPT_2":
-            profile["stage"] = "CODING_PRESENTED"
-            profile["coding_problem_id"] = problem.get("id")
-
-            formatted_problem = self._format_coding_problem(problem)
-            # Custom spoken audio: Ask before reading the entire question!
-            audio_ask = (
-                f"I have presented {problem['title']} on your screen. "
-                "Would you like me to read through the full problem statement and constraints for you, "
-                "or would you prefer to read it directly and begin explaining your approach?"
-            )
-            return (formatted_problem, audio_ask, True, True, problem, None, QuestionType.CONCEPT, profile)
-
-        # STAGE 3: Candidate Responds to Problem Presentation
-        if stage == "CODING_PRESENTED":
-            # Check if candidate requested reading the question
-            if any(w in lowered_input for w in ["yes", "read it", "please read", "read the question", "read aloud", "sure read"]):
-                profile["stage"] = "CODING_APPROACH_DISCUSSION"
-                spoken_problem = (
-                    f"Here is the problem: {problem['statement']} "
-                    f"The constraints are: {problem['constraints']}. "
-                    "Take a moment to review this. Please explain your observations, what data structure you plan to use, and your expected complexity before coding."
-                )
-                text_response = f"**Problem Statement Read:**\n\n{problem['statement']}\n\n**Constraints:**\n{problem['constraints']}\n\nBefore writing code, please explain your proposed approach and Big-O time and space complexity."
-                return (text_response, spoken_problem, True, False, problem, None, QuestionType.CONCEPT, profile)
-
-            # Candidate explained approach directly
-            if code_snippet and len(student_transcript.split()) < 10:
+        # STAGE: Candidate Explains Initial Approach
+        if stage in ["CODING_PRESENTED", "CODING_APPROACH_DISCUSSION"]:
+            if code_snippet and len(student_transcript.split()) < 8:
                 characteristics["jumps_to_coding_early"] = True
-                profile["stage"] = "CODING_APPROACH_DISCUSSION"
-                msg = "I notice you jumped straight into code. In a technical interview, it's very important to communicate your thought process first. Could you explain your observations, what data structure you selected, and why it is optimal?"
+                profile["stage"] = "CODING_IMPLEMENTATION_REVIEW"
+                msg = "I see your implementation! Before we run our test cases, could you explain your algorithmic logic and state your expected Big-O time and space complexity?"
                 return (msg, msg, True, False, problem, None, QuestionType.WHY, profile)
 
             if any(w in lowered_input for w in ["brute force", "check all", "nested loop", "two loops"]):
                 profile["stage"] = "CODING_OPTIMIZATION"
-                msg = "Good, that brute force approach gives us a correct baseline with O(N^2) time. Can we optimize it to avoid redundant lookups using an auxiliary data structure like a hash map?"
+                msg = "Good observation! That brute-force baseline runs in O(N^2) time. Can we optimize this to linear O(N) time using an auxiliary data structure like a hash map?"
                 return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
             profile["stage"] = "CODING_IMPLEMENTATION_REVIEW"
-            msg = "That is a very solid approach! What are your expected time and space complexities? Please go ahead and write your implementation in the code editor on the right and return the solution."
+            msg = "That is a sound approach! What are your expected Big-O time and space complexities? Please write and run your implementation in the code editor on the right, then submit your solution."
             return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
-        # STAGE 4: Coding Optimization Discussion
+        # STAGE: Coding Optimization Discussion
         if stage == "CODING_OPTIMIZATION":
             profile["stage"] = "CODING_IMPLEMENTATION_REVIEW"
-            msg = "Spot on! With that optimization in mind, go ahead and implement your solution in the code editor on the right and return the result."
+            msg = "Exactly right! With that optimization in mind, go ahead and implement your solution in the code editor on the right and run your test cases."
             return (msg, msg, True, False, problem, None, QuestionType.CONCEPT, profile)
 
-        # STAGE 5: Code Implementation Review & Edge Cases
+        # STAGE: Code Implementation Review & Edge Cases
         if stage == "CODING_IMPLEMENTATION_REVIEW":
             profile["stage"] = "CODING_FOLLOW_UP"
             if code_snippet and len(code_snippet.strip()) > 20:
-                msg = "Thank you for implementing that! Looking closely at your solution, how does your code handle boundary conditions, such as an empty input, duplicate values, or inputs where no valid pair exists?"
+                msg = "Great work implementing your solution! Looking closely at your code, how does it handle edge cases—such as duplicate elements, negative numbers, or arrays where no valid pair exists?"
                 return (msg, msg, True, False, problem, None, QuestionType.EDGE_CASE, profile)
             else:
-                msg = "Please walk me through your implementation line by line. What is the role of each variable you defined, and how do you ensure the return value is correct?"
+                msg = "Please walk me through your code line by line. What is the role of each variable you initialized, and how do you guarantee the return value is correct?"
                 return (msg, msg, True, False, problem, None, QuestionType.WHY, profile)
 
-        # STAGE 6: Coding Follow-up / Altered Constraint
+        # STAGE: Coding Follow-up / Altered Constraint
         if stage == "CODING_FOLLOW_UP":
             profile["stage"] = "WRAPUP"
             followup_prompt = problem.get("follow_up_sorted", "What if the input array is already sorted in ascending order? How would you solve this in O(1) auxiliary space without extra memory?")
-            msg = f"Well explained! Here is an optimization follow-up on this problem: {followup_prompt}"
+            msg = f"Well analyzed! Here is an optimization follow-up on this problem: {followup_prompt}"
             return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
 
-        # STAGE 7: Wrap-up & Conclusion
+        # STAGE: Wrap-up & Conclusion
         profile["stage"] = "COMPLETED"
         wrap_msg = (
-            "We have covered our primary conceptual foundations and LeetCode problem solving for this interview! "
-            "You did a great job explaining your reasoning and walking through your solution. "
-            "Is there any final insight or question you would like to share before we generate your official MSOT evaluation report?"
+            "We have covered your problem analysis, Big-O reasoning, and implementation in MSOT Code Arena! "
+            "You did a great job explaining your thought process. "
+            "Click 'End Interview' anytime to finalize and view your official evaluation scorecard."
         )
-        return (wrap_msg, wrap_msg, False, False, None, None, QuestionType.CONCEPT, profile)
+        return (wrap_msg, wrap_msg, True, False, problem, None, QuestionType.CONCEPT, profile)
 
     def process_turn(
         self,

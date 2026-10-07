@@ -286,7 +286,7 @@ Respond ONLY with valid JSON in this exact structure:
         Trains and stores a candidate's personal syllabus.
         """
         # Validate domain strictly to DSA or Web Development
-        is_dsa = any(k in subject.lower() or k in title.lower() for k in ["dsa", "data structure", "algorithm", "problem solving", "leetcode", "striver"])
+        is_dsa = any(k in subject.lower() or k in title.lower() for k in ["dsa", "data structure", "algorithm", "problem solving", "arena", "striver"])
         is_web = any(k in subject.lower() or k in title.lower() for k in ["web", "full stack", "frontend", "backend", "react", "node", "express", "javascript", "mern", "api"])
 
         normalized_subject = "Data Structures & Algorithms" if is_dsa or not is_web else "Web Development"

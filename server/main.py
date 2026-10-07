@@ -22,7 +22,7 @@ from server.models import (
     TrainedSyllabus, SyllabusTrainRequest, SyllabusToggleRequest
 )
 from server.syllabus_service import SyllabusService
-from server.viva_engine import VivaEngine
+from server.viva_engine import VivaEngine, ARENA_PROBLEMS
 from server.scoring_worker import ScoringWorker
 from server.seed_data import seed_database
 from server.load_test_suite import run_scalability_simulation
@@ -673,57 +673,65 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         student_name=req.student_name,
         started_at=time.time(),
         status=SessionStatus.IN_PROGRESS,
-        current_phase=SessionPhase.WARMUP,
+        current_phase=SessionPhase.DEPTH,
         elapsed_seconds=0.0,
         duration_minutes=duration_mins,
         examiner_persona=persona_key,
         subject_domain=subject_label,
         active_syllabus_id=active_s.id if active_s else None
     )
+
+    is_web = "web" in subject_label.lower()
+    prob_key = "debounce" if is_web else "two_sum"
+    problem = ARENA_PROBLEMS.get(prob_key, ARENA_PROBLEMS["two_sum"])
+
+    if active_s and active_s.generated_questions:
+        custom_q = active_s.generated_questions[0]
+        problem = {
+            "id": f"custom_{active_s.id}_0",
+            "source_type": "ADMIN_CUSTOM",
+            "title": custom_q.get("title", problem["title"]),
+            "level": custom_q.get("level", "Medium"),
+            "statement": custom_q.get("statement", problem["statement"]),
+            "input_desc": custom_q.get("input_desc", problem["input_desc"]),
+            "output_desc": custom_q.get("output_desc", problem["output_desc"]),
+            "constraints": custom_q.get("constraints", problem["constraints"]),
+            "examples": custom_q.get("examples", problem["examples"]),
+            "expected_concepts": custom_q.get("expected_concepts", problem["expected_concepts"]),
+            "hints": custom_q.get("hints", problem["hints"]),
+            "follow_up_sorted": custom_q.get("follow_up", problem.get("follow_up_sorted", "How would you optimize this approach?")),
+            "syllabus_title": active_s.title,
+            "starter_code_cpp": custom_q.get("starter_code_cpp", problem.get("starter_code_cpp", "")),
+            "starter_code_js": custom_q.get("starter_code_js", problem.get("starter_code_js", ""))
+        }
+
+    session.interview_profile = {
+        "stage": "CODING_APPROACH_DISCUSSION",
+        "preferred_domain": "webdev" if is_web else "dsa",
+        "coding_problem_id": problem["id"],
+        "hints_used": 0,
+        "hint_level": 0
+    }
+
     db.add(session)
     db.commit()
     db.refresh(session)
 
-    if persona_key == "ira":
-        if active_s:
-            opener_text = (
-                f"Hello {session.student_name}! I am Ira, your AI Recruiter from Mirai School of Technology. "
-                f"Welcome to your MSOT Mock Technical Interview! I have calibrated our interview questions based on your syllabus: '{active_s.title}'. "
-                "To help tailor our session today, could you briefly introduce yourself, let me know whether you are ready to begin, "
-                "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
-            )
-        else:
-            opener_text = (
-                f"Hello {session.student_name}! I am Ira, your AI Recruiter from Mirai School of Technology. "
-                "Welcome to your MSOT Mock Technical Interview! To help tailor our session today, could you briefly introduce yourself, "
-                "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
-                "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
-            )
-    else:
-        persona_names = {
-            "aria": "Aria",
-            "grok_sweet": "Grok AI",
-            "maya": "Maya",
-            "zara": "Zara",
-            "alex": "Alex Sterling",
-            "priya": "Prof. Priya Nair",
-            "eleanor": "Dr. Eleanor Vance"
-        }
-        p_name = persona_names.get(persona_key, "Ira")
-        opener_text = (
-            f"Hello {session.student_name}! I am {p_name}, your AI Technical Interviewer today. "
-            "Welcome to your technical interview. To help tailor our session, could you briefly introduce yourself, "
-            "let me know your primary focus area—Data Structures & Algorithms (DSA) or Web Development—"
-            "and whether you'd prefer questions targeted at Beginner, Intermediate, or Advanced level?"
-        )
+    syllabus_mention = f" [From Candidate's Uploaded Syllabus: {active_s.title}]" if active_s and active_s.generated_questions else ""
+    opener_text = (
+        f"Welcome {session.student_name} to MSOT Code Arena! "
+        f"We will begin directly with your technical problem{syllabus_mention}: {problem['title']}. "
+        "Review the statement, constraints, and test cases on your screen. "
+        "Please explain your proposed approach and Big-O complexity, then implement your solution in the editor on the right."
+    )
 
     first_qa = QuestionAsked(
         session_id=session.id,
         question_id=None,
         question_text=opener_text,
         timestamp_sec=0.0,
-        phase=SessionPhase.WARMUP,
-        question_type=QuestionType.PROJECT
+        phase=SessionPhase.DEPTH,
+        question_type=QuestionType.CONCEPT
     )
     db.add(first_qa)
     db.commit()
@@ -735,16 +743,16 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         "duration_minutes": duration_mins,
         "first_question": opener_text,
         "initial_prompt": opener_text,
-        "question_type": QuestionType.PROJECT.value,
-        "phase": SessionPhase.WARMUP.value,
+        "question_type": QuestionType.CONCEPT.value,
+        "phase": SessionPhase.DEPTH.value,
         "elapsed_seconds": 0.0,
         "examiner_persona": persona_key,
         "subject_domain": subject_label,
         "active_syllabus_id": active_s.id if active_s else None,
         "active_syllabus_title": active_s.title if active_s else None,
-        "is_coding_question": False,
+        "is_coding_question": True,
         "should_ask_to_read": False,
-        "coding_problem_details": None
+        "coding_problem_details": problem
     }
 
 @app.post("/api/session/turn")
@@ -1122,12 +1130,12 @@ def get_load_test_results():
     """Returns load testing results proving 50, 100, and 150 concurrent sessions."""
     return run_scalability_simulation()
 
-# --- LeetCode Code Execution Sandbox Endpoint ---
+# --- MSOT Code Arena Execution Sandbox Endpoint ---
 @app.post("/api/code/run")
 def execute_code(req: CodeExecutionRequest):
     """
     Executes candidate code in an isolated sandbox with real-time test case assertions,
-    runtime latency, memory metrics, and stdout/stderr capture (LeetCode format).
+    runtime latency, memory metrics, and stdout/stderr capture.
     """
     return run_code_sandbox(
         code=req.code,

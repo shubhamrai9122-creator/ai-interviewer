@@ -192,7 +192,7 @@ class TestAIVivaPlatform(unittest.TestCase):
         start_res = start_viva_session(start_req, db=self.db)
         self.assertEqual(start_res["examiner_persona"], "aria")
         self.assertEqual(start_res["duration_minutes"], 0)
-        self.assertIn("Aria", start_res["initial_prompt"])
+        self.assertIn("MSOT Code Arena", start_res["initial_prompt"])
         self.assertIn("Pooja Patel", start_res["initial_prompt"])
 
         # 4. Verify Unlimited mode calculate_phase does not cap at 900s
@@ -218,60 +218,29 @@ class TestAIVivaPlatform(unittest.TestCase):
         )
         start_res = start_viva_session(start_req, db=self.db)
         s_id = start_res["session_id"]
-        self.assertIn("AI Technical Interviewer", start_res["first_question"])
-        self.assertIn("Data Structures & Algorithms (DSA) or Web Development", start_res["first_question"])
-        self.assertIn("Beginner, Intermediate, or Advanced", start_res["first_question"])
+        self.assertIn("MSOT Code Arena", start_res["first_question"])
+        self.assertIn("Devika Sen", start_res["first_question"])
+        self.assertTrue(start_res["is_coding_question"])
 
-        # 2. Turn 1: Candidate introduces background, chooses DSA at Intermediate level
+        # 2. Turn 1: Candidate requests a hint
         engine = VivaEngine(self.db)
         turn1 = engine.process_turn(
             session_id=s_id,
             elapsed_seconds=30,
-            student_transcript="Hi! I have 2 years of experience with Python and JavaScript. I would like to focus on DSA at an Intermediate level."
+            student_transcript="Could you give me a hint to get started?",
+            is_hint_req=True
         )
         self.assertIn("ai_response_text", turn1)
-        self.assertIn("Linked List", turn1["ai_response_text"])
-        self.assertFalse(turn1["is_coding_question"])
+        self.assertIn("[Hint]", turn1["ai_response_text"])
+        self.assertEqual(turn1["hints_used"], 1)
 
-        # 3. Turn 2: Candidate answers General Q1 -> AI generates continuous Socratic follow-up Q2
+        # 3. Turn 2: Candidate explains approach before code
         turn2 = engine.process_turn(
             session_id=s_id,
             elapsed_seconds=90,
-            student_transcript="Arrays provide contiguous memory with O(1) random access, while linked lists use node pointers requiring O(N) traversal."
+            student_transcript="I observe that we can maintain a timerId variable in a closure and clearTimeout on each call."
         )
-        self.assertIn("two-pointer", turn2["ai_response_text"].lower())
-        self.assertFalse(turn2["is_coding_question"])
-
-        # 4. Turn 3: Candidate answers Continuous Q2 -> AI advances to LeetCode coding problem
-        turn3 = engine.process_turn(
-            session_id=s_id,
-            elapsed_seconds=140,
-            student_transcript="We can maintain a slow pointer moving 1 step and a fast pointer moving 2 steps. When fast reaches null, slow is at the middle."
-        )
-        self.assertIn("**Problem Statement:**", turn3["ai_response_text"])
-        self.assertIn("**Input Description:**", turn3["ai_response_text"])
-        self.assertIn("**Constraints:**", turn3["ai_response_text"])
-        self.assertTrue(turn3["is_coding_question"])
-        self.assertTrue(turn3["should_ask_to_read"])
-        self.assertIn("Would you like me to read through the full problem statement", turn3["audio_spoken_text"])
-
-        # 5. Turn 4: Candidate requests a progressive hint (Section 6)
-        turn4 = engine.process_turn(
-            session_id=s_id,
-            elapsed_seconds=180,
-            student_transcript="Could you give me a small hint to get started?",
-            is_hint_req=True
-        )
-        self.assertIn("[Hint Level 1]:", turn4["ai_response_text"])
-        self.assertEqual(turn4["hints_used"], 1)
-
-        # 6. Turn 5: Candidate explains approach before code (Section 3 & 5)
-        turn5 = engine.process_turn(
-            session_id=s_id,
-            elapsed_seconds=240,
-            student_transcript="I observe that we can use a two-pointer sliding window with a hash map to keep track of character frequencies in O(N) time and O(N) space."
-        )
-        self.assertIn("code editor", turn5["ai_response_text"].lower())
+        self.assertIn("code editor", turn2["ai_response_text"].lower())
 
         # 7. Turn 6: Candidate submits code in editor (Section 13)
         code = "def lengthOfLongestSubstring(s: str) -> int:\n    seen = {}\n    left = 0\n    max_len = 0\n    for right, c in enumerate(s):\n        if c in seen and seen[c] >= left:\n            left = seen[c] + 1\n        seen[c] = right\n        max_len = max(max_len, right - left + 1)\n    return max_len"
@@ -327,46 +296,33 @@ class TestAIVivaPlatform(unittest.TestCase):
         self.assertEqual(active_s.title, "My Advanced Graph Algorithms Notes")
 
         # Test live viva session using this trained syllabus
-        session = VivaSession(
-            viva_id=42,
+        from server.main import start_viva_session
+        from server.models import StudentStartRequest
+
+        start_req = StudentStartRequest(
             student_id="STU_TEST_SYLLABUS",
             student_name="Aarav Gupta",
-            started_at=100.0,
-            status=SessionStatus.IN_PROGRESS,
-            current_phase=SessionPhase.WARMUP,
-            elapsed_seconds=0.0,
-            duration_minutes=15,
+            viva_id=42,
+            consent_given=True,
             examiner_persona="ira",
             subject_domain="Data Structures & Algorithms",
-            active_syllabus_id=active_s.id,
-            interview_profile={"stage": "GENERAL_CONCEPT_2"}
+            duration_minutes=15,
+            active_syllabus_id=active_s.id
         )
-        self.db.add(session)
-        self.db.commit()
-
-        qa1 = QuestionAsked(
-            session_id=session.id,
-            question_id=None,
-            question_text="Hello Aarav! Welcome to your technical interview.",
-            timestamp_sec=0.0,
-            phase=SessionPhase.WARMUP,
-            question_type=QuestionType.PROJECT
-        )
-        self.db.add(qa1)
-        self.db.commit()
+        start_res = start_viva_session(start_req, db=self.db)
+        self.assertIn("From Candidate's Uploaded Syllabus", start_res["first_question"])
+        self.assertIn("My Advanced Graph Algorithms Notes", start_res["first_question"])
+        self.assertTrue(start_res["is_coding_question"])
+        self.assertIsNotNone(start_res["coding_problem_details"])
 
         engine = VivaEngine(self.db)
-        # Turn 1: Candidate responds at GENERAL_CONCEPT_2 -> Transitions stage to CODING_PRESENTED from syllabus
         turn1 = engine.process_turn(
-            session_id=session.id,
+            session_id=start_res["session_id"],
             elapsed_seconds=45.0,
             student_transcript="In graph traversal, BFS explores level by level using a queue while DFS explores paths with recursion."
         )
-        self.assertIn("From Candidate's Uploaded Syllabus", turn1["ai_response_text"])
-        self.assertIn("My Advanced Graph Algorithms Notes", turn1["ai_response_text"])
+        self.assertIn("ai_response_text", turn1)
         self.assertTrue(turn1["is_coding_question"])
-        self.assertTrue(turn1["should_ask_to_read"])
-        self.assertIn("Would you like me to read through the full problem statement", turn1["audio_spoken_text"])
 
 if __name__ == "__main__":
     unittest.main()
