@@ -8,6 +8,24 @@ import {
 const API_BASE = 'http://localhost:8000';
 
 const STARTER_CODES = {
+  cpp: {
+    dsa: `class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Return indices of the two numbers such that they add up to target
+        
+        return {};
+    }
+};`,
+    webdev: `class Solution {
+public:
+    int calculateLatency(int requestCount, int networkDelay) {
+        // Return computed server latency in milliseconds
+        
+        return 0;
+    }
+};`
+  },
   javascript: {
     dsa: `/**
  * @param {number[]} nums
@@ -15,129 +33,50 @@ const STARTER_CODES = {
  * @return {number[]}
  */
 var twoSum = function(nums, target) {
-    // TODO: Write your algorithm here
+    // Return indices of the two numbers such that they add up to target
     
-};
-
-// Driver Harness for evaluation
-const nums = [2, 7, 11, 15];
-const target = 9;
-console.log(JSON.stringify(twoSum(nums, target)));
-`,
+    return [];
+};`,
     webdev: `/**
- * Web Development: Asynchronous Event Queue / Debounced Dispatcher
  * @param {Function} fn
- * @param {number} delay
+ * @param {number} t
  * @return {Function}
  */
-function debounce(fn, delay) {
-    // TODO: Implement debounced function wrapper
+var debounce = function(fn, t) {
+    // Return a debounced version of that function
     
-}
-
-// Driver Test Execution
-let counter = 0;
-const increment = debounce(() => counter++, 50);
-increment();
-increment();
-increment();
-setTimeout(() => {
-    console.log("Debounced Execution Result:", counter === 1 ? "PASSED" : "FAILED");
-}, 100);
-`
+    return function(...args) {
+        
+    };
+};`
   },
   python: {
-    dsa: `from typing import List
-
-class Solution:
+    dsa: `class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        # TODO: Implement your solution here
-        pass
-
-# Driver harness
-if __name__ == "__main__":
-    sol = Solution()
-    print(sol.twoSum([2, 7, 11, 15], 9))
-`,
-    webdev: `"""
-Web Development / Backend Systems: LRU Cache Implementation
-"""
-class LRUCache:
-    def __init__(self, capacity: int):
-        # TODO: Initialize your data structures
-        pass
-
-    def get(self, key: int) -> int:
-        # TODO: Return value or -1 if not found
-        return -1
-
-    def put(self, key: int, value: int) -> None:
-        # TODO: Insert or update key, evict least recently used if over capacity
-        pass
-
-if __name__ == "__main__":
-    lru = LRUCache(2)
-    lru.put(1, 1)
-    lru.put(2, 2)
-    print("LRU get(1):", lru.get(1))
-`
-  },
-  cpp: {
-    dsa: `// C++20 LeetCode Solution
-#include <iostream>
-#include <vector>
-
-class Solution {
-public:
-    std::vector<int> twoSum(const std::vector<int>& nums, int target) {
-        // TODO: Implement your solution here
-        return {};
-    }
-};
-
-int main() {
-    Solution s;
-    auto res = s.twoSum({2, 7, 11, 15}, 9);
-    std::cout << "[" << (res.size() > 0 ? res[0] : -1) << ", " << (res.size() > 1 ? res[1] : -1) << "]" << std::endl;
-    return 0;
-}
-`,
-    webdev: `// C++ High-Throughput HTTP Event Worker
-#include <iostream>
-#include <string>
-
-int main() {
-    // TODO: Implement your event worker logic
-    std::cout << "HTTP Async Event Loop Running on Port 8080" << std::endl;
-    return 0;
-}
-`
+        # Return indices of the two numbers such that they add up to target
+        
+        return []`,
+    webdev: `class Solution:
+    def debounce(self, fn, t: int):
+        # Return debounced version of function
+        
+        pass`
   },
   java: {
-    dsa: `// Java 17 LeetCode Solution
-import java.util.Arrays;
-
-public class Solution {
+    dsa: `class Solution {
     public int[] twoSum(int[] nums, int target) {
-        // TODO: Implement your solution here
-        return new int[0];
+        // Return indices of the two numbers such that they add up to target
+        
+        return new int[]{};
     }
-
-    public static void main(String[] args) {
-        Solution sol = new Solution();
-        int[] result = sol.twoSum(new int[]{2, 7, 11, 15}, 9);
-        System.out.println(Arrays.toString(result));
+}`,
+    webdev: `class Solution {
+    public int handleRequest(int t) {
+        // Return processed response status code
+        
+        return 200;
     }
-}
-`,
-    webdev: `// Java Microservice Transaction Handler
-public class Application {
-    public static void main(String[] args) {
-        // TODO: Implement transaction coordinator logic
-        System.out.println("Distributed Transaction Coordinator Active");
-    }
-}
-`
+}`
   }
 };
 
@@ -182,6 +121,55 @@ const DEFAULT_WEB_TEST_CASES = [
   }
 ];
 
+const highlightSyntax = (rawCode, lang) => {
+  if (!rawCode) return '&nbsp;';
+
+  let escaped = rawCode
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const tokens = [];
+  const saveToken = (html) => {
+    tokens.push(html);
+    return `___TOKEN_${tokens.length - 1}___`;
+  };
+
+  // 1. Comments
+  escaped = escaped.replace(/\/\*[\s\S]*?\*\//g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
+  escaped = escaped.replace(/(\/\/[^\n]*)/g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
+  if (lang === 'python') {
+    escaped = escaped.replace(/(#[^\n]*)/g, (m) => saveToken(`<span style="color: #6A9955; font-style: italic;">${m}</span>`));
+  }
+
+  // 2. Strings
+  escaped = escaped.replace(/("(\\"|[^"])*"|'(\\'|[^'])*'|`(\\`|[^`])*`)/g, (m) => saveToken(`<span style="color: #CE9178;">${m}</span>`));
+
+  // 3. Types
+  escaped = escaped.replace(/\b(int|string|vector|bool|boolean|void|float|double|char|long|List|Dict|TreeNode|ListNode|Solution|Array|Object|Function|number|Promise|size_t)\b/g, (m) => `<span style="color: #4EC9B0; font-weight: 600;">${m}</span>`);
+
+  // 4. Keywords
+  escaped = escaped.replace(/\b(class|public|private|protected|return|var|let|const|function|def|import|from|for|while|if|else|new|this|auto|using|namespace|struct|static|async|await|try|catch|throw|typeof|instanceof|switch|case|break|continue|pass)\b/g, (m) => `<span style="color: #569CD6; font-weight: 600;">${m}</span>`);
+
+  // 5. Literals
+  escaped = escaped.replace(/\b(true|false|null|nullptr|None|undefined)\b/g, (m) => `<span style="color: #569CD6; font-weight: 600;">${m}</span>`);
+
+  // 6. Numbers
+  escaped = escaped.replace(/\b(\d+(\.\d+)?)\b/g, (m) => `<span style="color: #B5CEA8;">${m}</span>`);
+
+  // 7. Functions
+  escaped = escaped.replace(/\b([a-zA-Z_]\w*)(?=\s*\()/g, (m) => `<span style="color: #DCDCAA;">${m}</span>`);
+
+  // 8. Restore tokens
+  escaped = escaped.replace(/___TOKEN_(\d+)___/g, (_, idx) => tokens[parseInt(idx, 10)]);
+
+  if (rawCode.endsWith('\n')) {
+    escaped += ' ';
+  }
+
+  return escaped;
+};
+
 export default function HackerRankCodeEditor({
   subject = 'dsa', // 'dsa' or 'webdev'
   code = '',
@@ -199,6 +187,7 @@ export default function HackerRankCodeEditor({
   const [copied, setCopied] = useState(false);
   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
   const textareaRef = useRef(null);
+  const highlightRef = useRef(null);
   const gutterRef = useRef(null);
 
   const testCases = subject === 'webdev' ? DEFAULT_WEB_TEST_CASES : DEFAULT_DSA_TEST_CASES;
@@ -288,6 +277,10 @@ export default function HackerRankCodeEditor({
   const handleScroll = (e) => {
     if (gutterRef.current) {
       gutterRef.current.scrollTop = e.target.scrollTop;
+    }
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = e.target.scrollTop;
+      highlightRef.current.scrollLeft = e.target.scrollLeft;
     }
   };
 
@@ -459,7 +452,7 @@ export default function HackerRankCodeEditor({
         </div>
       </div>
 
-      {/* 2. LeetCode Editor Body (Line Numbers + Dark Code Canvas Covering Left Screen) */}
+      {/* 2. LeetCode Editor Body (Line Numbers + Colorful Syntax Layer) */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -472,15 +465,15 @@ export default function HackerRankCodeEditor({
           ref={gutterRef}
           style={{
             width: '46px',
-            padding: '14px 6px 14px 0',
+            padding: '14px 8px 14px 0',
             background: '#1E1E1E',
             borderRight: '1px solid #2B2B2B',
             textAlign: 'right',
             userSelect: 'none',
-            fontFamily: 'var(--mono)',
-            fontSize: '12px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '13px',
             lineHeight: '1.6',
-            color: '#5A5A5A',
+            color: '#858585',
             overflowY: 'hidden'
           }}
         >
@@ -489,35 +482,70 @@ export default function HackerRankCodeEditor({
           ))}
         </div>
 
-        {/* Code Input */}
-        <textarea
-          ref={textareaRef}
-          value={code}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onScroll={handleScroll}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-          style={{
-            flex: 1,
-            height: '100%',
-            background: 'transparent',
-            color: '#D4D4D4',
-            fontFamily: 'var(--mono)',
-            fontSize: '13px',
-            lineHeight: '1.6',
-            padding: '14px 16px',
-            border: 'none',
-            outline: 'none',
-            resize: 'none',
-            whiteSpace: 'pre',
-            overflowWrap: 'normal',
-            overflowX: 'auto',
-            overflowY: 'auto',
-            tabSize: 4
-          }}
-        />
+        {/* Code Canvas Container with Syntax Highlight Underlay */}
+        <div style={{ position: 'relative', flex: 1, height: '100%', overflow: 'hidden' }}>
+          {/* Syntax Highlighted HTML Underlay */}
+          <pre
+            ref={highlightRef}
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: highlightSyntax(code, language) }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              margin: 0,
+              padding: '14px 16px',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: '13px',
+              lineHeight: '1.6',
+              whiteSpace: 'pre',
+              wordWrap: 'normal',
+              pointerEvents: 'none',
+              overflow: 'hidden',
+              background: 'transparent',
+              color: '#D4D4D4',
+              tabSize: 4
+            }}
+          />
+
+          {/* Interactive Transparent Textarea Overlay */}
+          <textarea
+            ref={textareaRef}
+            value={code}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="off"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              margin: 0,
+              padding: '14px 16px',
+              boxSizing: 'border-box',
+              background: 'transparent',
+              color: 'transparent',
+              caretColor: '#38BDF8',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: '13px',
+              lineHeight: '1.6',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              whiteSpace: 'pre',
+              wordWrap: 'normal',
+              overflowX: 'auto',
+              overflowY: 'auto',
+              tabSize: 4
+            }}
+          />
+        </div>
       </div>
 
       {/* 3. LeetCode Bottom Testcase & Test Result Panel with Collapsible Drawer */}

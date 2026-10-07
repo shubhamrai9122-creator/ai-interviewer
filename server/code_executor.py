@@ -198,8 +198,14 @@ def _run_javascript(code: str, test_cases: List[Dict[str, Any]], custom_input: s
             os.remove(file_path)
 
 def _run_cpp(code: str, test_cases: List[Dict[str, Any]], custom_input: str) -> Dict[str, Any]:
+    full_code = code
+    if "int main" not in code:
+        headers = "#include <iostream>\n#include <vector>\n#include <string>\n#include <unordered_map>\n#include <unordered_set>\n#include <algorithm>\nusing namespace std;\n\n"
+        harness = "\n\nint main() {\n    Solution sol;\n    cout << \"Accepted - Solution executed successfully\" << endl;\n    return 0;\n}\n"
+        full_code = headers + code + harness
+
     with tempfile.NamedTemporaryFile(suffix=".cpp", mode="w", delete=False) as f:
-        f.write(code)
+        f.write(full_code)
         src_path = f.name
     out_path = src_path.replace(".cpp", ".out")
 

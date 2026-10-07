@@ -67,7 +67,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           </div>
         </div>
 
-        {/* Internshala Navigation Tabs */}
+        {/* Navigation Tabs (Student View: Mock Interview & Evaluation Reports) */}
         <nav style={{
           display: 'flex',
           gap: '4px',
@@ -95,27 +95,6 @@ export default function Navbar({ activeTab, setActiveTab }) {
           >
             <Mic size={15} color={activeTab === 'interview' ? '#FFFFFF' : '#64748B'} />
             Mock Interview Room
-          </button>
-
-          <button
-            onClick={() => setActiveTab('training')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              padding: '8px 18px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === 'training' ? '#008BDC' : 'transparent',
-              color: activeTab === 'training' ? '#FFFFFF' : '#475569',
-              boxShadow: activeTab === 'training' ? '0 2px 6px rgba(0, 139, 220, 0.25)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <BookOpen size={15} color={activeTab === 'training' ? '#FFFFFF' : '#64748B'} />
-            Syllabus & AI Training Lab
           </button>
 
           <button

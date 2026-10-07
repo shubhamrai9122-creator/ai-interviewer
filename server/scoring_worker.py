@@ -115,95 +115,152 @@ class ScoringWorker:
         web_raw = (technical_depth_10 * 3.5) + (problem_solving_10 * 2.5) + (communication_10 * 2.0) + (adaptability_10 * 2.0)
         web_dev_score = round(max(25.0, min(100.0, web_raw)), 1)
 
-        # Overall Score (/100)
-        if preferred_domain == "dsa":
-            overall_score = round((dsa_score * 0.60) + (web_dev_score * 0.40), 1)
-        elif preferred_domain == "webdev":
-            overall_score = round((web_dev_score * 0.60) + (dsa_score * 0.40), 1)
+        # Check interview domain strictly
+        subj_lower = (session.subject_domain or "").lower()
+        is_web = preferred_domain == "webdev" or "web" in subj_lower
+        is_dsa = not is_web  # strictly either DSA or Web Development
+
+        if is_dsa:
+            overall_score = dsa_score
+            active_domain_title = "Data Structures & Algorithms"
+            active_domain_key = "dsa"
+            active_score = dsa_score
         else:
-            overall_score = round((dsa_score * 0.50) + (web_dev_score * 0.50), 1)
+            overall_score = web_dev_score
+            active_domain_title = "Web Development"
+            active_domain_key = "webdev"
+            active_score = web_dev_score
 
         # Backward compatibility rubric scores (0 to 5)
         conceptual_score = round(min(5.0, max(1.0, technical_depth_10 / 2.0)), 1)
         depth_score = round(min(5.0, max(1.0, (technical_depth_10 + complexity_analysis_10) / 4.0)), 1)
         problem_score = round(min(5.0, max(1.0, problem_solving_10 / 2.0)), 1)
-        practical_score = round(min(5.0, max(1.0, (code_quality_10 + web_dev_score / 20.0) / 2.0)), 1)
+        practical_score = round(min(5.0, max(1.0, (code_quality_10 + (dsa_score if is_dsa else web_dev_score) / 20.0) / 2.0)), 1)
         communication_score = round(min(5.0, max(1.0, communication_10 / 2.0)), 1)
 
-        # 3. Categorized Deficits (Section 17 distinction)
+        # 3. Categorized Deficits (Domain-Specific)
         knowledge_gaps = []
         reasoning_problems = []
         implementation_mistakes = []
         communication_problems = []
 
-        if not characteristics.get("analyzes_space_complexity"):
-            knowledge_gaps.append("Formal auxiliary space complexity accounting under dynamic structures")
-        if web_dev_score < 75:
-            knowledge_gaps.append("Stateless JWT revocation mechanics and CSRF protection headers (SameSite)")
-        if not characteristics.get("identifies_core_pattern"):
-            knowledge_gaps.append("Identification of optimal data structure invariants (e.g. prefix frequency hashing)")
+        if is_dsa:
+            if not characteristics.get("analyzes_space_complexity"):
+                knowledge_gaps.append("Formal auxiliary space complexity accounting under recursion and dynamic structures")
+            if not characteristics.get("identifies_core_pattern"):
+                knowledge_gaps.append("Identification of optimal data structure invariants (e.g. prefix frequency hashing)")
+            if dsa_score < 75:
+                knowledge_gaps.append("Amortized vs worst-case complexity trade-offs in hash table collisions")
 
-        if not characteristics.get("optimizes_own_solution"):
-            reasoning_problems.append("Difficulty transitioning from brute force baseline to sub-quadratic optimization without prompts")
-        if hints_used >= 2:
-            reasoning_problems.append(f"Required {hints_used} progressive hints to formulate optimal window bounds")
+            if not characteristics.get("optimizes_own_solution"):
+                reasoning_problems.append("Difficulty transitioning from brute force baseline to sub-quadratic optimization without prompts")
+            if hints_used >= 2:
+                reasoning_problems.append(f"Required {hints_used} progressive hints to formulate optimal window bounds")
 
-        if code_submitted_count == 0:
-            implementation_mistakes.append("Did not provide completed code implementation in the sandbox editor")
-        elif not characteristics.get("considers_edge_cases"):
-            implementation_mistakes.append("Overlooked boundary edge cases (empty collection, single element, negative keys)")
+            if code_submitted_count == 0:
+                implementation_mistakes.append("Did not provide completed code implementation in the sandbox editor")
+            elif not characteristics.get("considers_edge_cases"):
+                implementation_mistakes.append("Overlooked boundary edge cases (empty collection, single element, negative keys)")
+        else:
+            if web_dev_score < 75:
+                knowledge_gaps.append("Stateless JWT revocation mechanics and CSRF protection headers (SameSite)")
+            if not characteristics.get("identifies_core_pattern"):
+                knowledge_gaps.append("JavaScript Event Loop task queue priority (Microtasks vs Macrotasks)")
+            if web_dev_score < 80:
+                knowledge_gaps.append("Database query optimization and index design under high write contention")
+
+            if not characteristics.get("optimizes_own_solution"):
+                reasoning_problems.append("Trade-offs in client-side caching vs server-side cache invalidation")
+            if hints_used >= 2:
+                reasoning_problems.append(f"Required {hints_used} hints to structure debouncing/throttling closure semantics")
+
+            if code_submitted_count == 0:
+                implementation_mistakes.append("Did not provide completed JavaScript implementation in the editor")
+            elif not characteristics.get("considers_edge_cases"):
+                implementation_mistakes.append("Overlooked edge cases such as immediate function execution or unhandled Promise rejections")
 
         if characteristics.get("jumps_to_coding_early"):
             communication_problems.append("Tendency to jump directly into coding before clarifying requirements and constraints")
         if total_words < 40:
             communication_problems.append("Very concise explanations; could expand verbal reasoning on design trade-offs")
 
-        # 4. Qualitative Lists
+        # 4. Qualitative Lists (Strictly Domain-Separated)
         strongest_areas = []
-        if problem_solving_10 >= 8.0: strongest_areas.append("Algorithmic problem decomposition and approach selection")
-        if complexity_analysis_10 >= 8.0: strongest_areas.append("Rigorous Big-O time and space complexity evaluation")
-        if communication_10 >= 8.0: strongest_areas.append("Clear, structured technical communication and rationale defense")
-        if web_dev_score >= 80.0: strongest_areas.append("Practical full-stack web architecture and authentication flows")
-        if not strongest_areas: strongest_areas.append("Core foundational data structure comprehension")
-
         weakest_areas = []
-        if complexity_analysis_10 < 7.5: weakest_areas.append("Space complexity and auxiliary memory overhead analysis")
-        if debugging_10 < 7.5: weakest_areas.append("Anticipating boundary conditions and edge-case counterexamples")
-        if web_dev_score < 75.0: weakest_areas.append("Security mitigations against XSS vs CSRF in token storage")
-        if not weakest_areas: weakest_areas.append("Scaling systems under extreme memory pressure")
-
         repeated_mistakes = []
-        if hints_used >= 2: repeated_mistakes.append("Relying on interviewer guidance to narrow search space")
-        if characteristics.get("jumps_to_coding_early"): repeated_mistakes.append("Premature implementation before articulating algorithmic invariant")
-        if not repeated_mistakes: repeated_mistakes.append("None detected during this session")
 
-        improvement_topics = [
-            "Two Pointers & Sliding Window edge-case handling",
-            "HttpOnly cookies with SameSite attributes vs localStorage",
-            "Stateless JWT blacklist caching using Redis with TTL",
-            "Time and space amortized complexity analysis"
-        ]
+        if is_dsa:
+            if problem_solving_10 >= 8.0: strongest_areas.append("Algorithmic problem decomposition and approach selection")
+            if complexity_analysis_10 >= 8.0: strongest_areas.append("Rigorous Big-O time and space complexity evaluation")
+            if communication_10 >= 8.0: strongest_areas.append("Clear, structured technical communication and rationale defense")
+            if code_quality_10 >= 8.0: strongest_areas.append("Clean LeetCode-style solution implementation and pointer manipulation")
+            if not strongest_areas: strongest_areas.append("Core foundational data structure comprehension")
 
-        # Recommended next topics
-        if overall_score >= 80:
-            recommended_topics = ["Dynamic Programming Space Optimization", "Distributed Caching with Redis", "Event-Driven WebSockets & SSE"]
-            suggested_difficulty = "Advanced"
-        elif overall_score >= 60:
-            recommended_topics = ["Sliding Window & Monotonic Queue", "JWT Refresh Token Rotation", "SQL Indexing & Explain Plans"]
-            suggested_difficulty = "Intermediate"
+            if complexity_analysis_10 < 7.5: weakest_areas.append("Space complexity and auxiliary memory overhead analysis")
+            if debugging_10 < 7.5: weakest_areas.append("Anticipating boundary conditions and edge-case counterexamples")
+            if problem_solving_10 < 7.5: weakest_areas.append("Sub-quadratic algorithmic pattern identification under pressure")
+            if not weakest_areas: weakest_areas.append("Handling high-constraint edge cases and memory limits")
+
+            improvement_topics = [
+                "Two Pointers & Sliding Window edge-case handling",
+                "Hash Table lookup invariants and collision handling",
+                "Binary Search on Answer / Monotonic Predicates",
+                "Time and space amortized complexity analysis"
+            ]
+
+            if overall_score >= 80:
+                recommended_topics = ["Dynamic Programming Space Optimization", "Segment Trees & Fenwick Trees", "Monotonic Queue & Deque"]
+                suggested_difficulty = "Advanced"
+            elif overall_score >= 60:
+                recommended_topics = ["Sliding Window & Two Pointers", "Binary Tree DFS/BFS Traversal", "Heap / Priority Queue Patterns"]
+                suggested_difficulty = "Intermediate"
+            else:
+                recommended_topics = ["Array Traversal & In-Place Swaps", "Hash Map Lookups & Sets", "Recursion Base Cases & Call Stack"]
+                suggested_difficulty = "Beginner"
+
+            perf_summary = (
+                f"Candidate completed a dedicated Data Structures & Algorithms (DSA) interview scoring {overall_score}/100. "
+                f"Problem-solving was rated {problem_solving_10}/10 with {complexity_analysis_10}/10 in complexity analysis and {communication_10}/10 in technical communication. "
+                f"The candidate {'effectively optimized their initial approach to optimal bounds' if characteristics.get('optimizes_own_solution') else 'required guided nudges to reach optimal bounds'}, "
+                f"using {hints_used} hint(s) across the interview session."
+            )
         else:
-            recommended_topics = ["Hash Table Operations & Invariants", "DOM Event Propagation & Promises", "Array Traversal & Two Pointers"]
-            suggested_difficulty = "Beginner"
+            if technical_depth_10 >= 8.0: strongest_areas.append("Practical full-stack web architecture and asynchronous event flows")
+            if communication_10 >= 8.0: strongest_areas.append("Clear explanation of HTTP lifecycle, headers, and state management")
+            if problem_solving_10 >= 8.0: strongest_areas.append("System scalability decomposition and API security best practices")
+            if not strongest_areas: strongest_areas.append("Foundational client-server communication principles")
 
-        # Performance summary
-        perf_summary = (
-            f"Candidate demonstrated a solid technical foundation scoring {overall_score}/100 overall "
-            f"({dsa_score}/100 in DSA, {web_dev_score}/100 in Web Development). "
-            f"Problem-solving was rated {problem_solving_10}/10 with {communication_10}/10 communication clarity. "
-            f"The candidate {'effectively optimized their initial approach' if characteristics.get('optimizes_own_solution') else 'required guided nudges to reach optimal bounds'}, "
-            f"using {hints_used} hint(s) across the interview. "
-            f"In Web Development, they demonstrated {'strong architectural grounding' if web_dev_score >= 75 else 'acceptable baseline knowledge with room to strengthen security mitigations'}."
-        )
+            if technical_depth_10 < 7.5: weakest_areas.append("Security mitigations against XSS vs CSRF in token storage")
+            if code_quality_10 < 7.5: weakest_areas.append("Closure scope management and asynchronous event timing")
+            if not weakest_areas: weakest_areas.append("Distributed caching invalidation under high traffic")
+
+            improvement_topics = [
+                "HttpOnly cookies with SameSite attributes vs localStorage",
+                "Stateless JWT blacklist caching using Redis with TTL",
+                "JavaScript Event Loop (Microtask vs Macrotask queue)",
+                "React Reconciliation & Virtual DOM Diffing"
+            ]
+
+            if overall_score >= 80:
+                recommended_topics = ["Distributed Caching with Redis", "Event-Driven WebSockets & SSE", "Database Sharding & Read Replicas"]
+                suggested_difficulty = "Advanced"
+            elif overall_score >= 60:
+                recommended_topics = ["JWT Refresh Token Rotation", "SQL Indexing & Explain Plans", "REST API Idempotency & Rate Limiting"]
+                suggested_difficulty = "Intermediate"
+            else:
+                recommended_topics = ["DOM Event Propagation & Promises", "Async/Await Error Handling", "HTTP Methods & Status Codes"]
+                suggested_difficulty = "Beginner"
+
+            perf_summary = (
+                f"Candidate completed a dedicated Web Development interview scoring {overall_score}/100. "
+                f"Technical depth was rated {technical_depth_10}/10 with {problem_solving_10}/10 in architectural problem-solving and {communication_10}/10 in communication clarity. "
+                f"The candidate demonstrated {'strong architectural grounding' if web_dev_score >= 75 else 'acceptable baseline knowledge with room to strengthen security mitigations'}, "
+                f"using {hints_used} hint(s) across the session."
+            )
+
+        if hints_used >= 2: repeated_mistakes.append("Relying on interviewer hints to structure optimal bounds")
+        if characteristics.get("jumps_to_coding_early"): repeated_mistakes.append("Premature implementation before articulating algorithmic/architectural rationale")
+        if not repeated_mistakes: repeated_mistakes.append("None detected during this session")
 
         confidence = 0.96
         flagged = session.flagged_for_review
@@ -218,8 +275,10 @@ class ScoringWorker:
 
         evaluation_report = {
             "overall_score": overall_score,
-            "dsa_score": dsa_score,
-            "web_dev_score": web_dev_score,
+            "interview_track": active_domain_key,
+            "track_title": active_domain_title,
+            "dsa_score": dsa_score if is_dsa else None,
+            "web_dev_score": web_dev_score if is_web else None,
             "subscores": {
                 "problem_solving": problem_solving_10,
                 "communication": communication_10,

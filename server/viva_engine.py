@@ -58,12 +58,7 @@ LEETCODE_PROBLEMS = {
         "constraints": "- 2 <= nums.length <= 10^4\n- -10^9 <= nums[i] <= 10^9\n- -10^9 <= target <= 10^9\n- Exactly one valid answer exists.",
         "examples": "Example 1:\nInput: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].\n\nExample 2:\nInput: nums = [3,2,4], target = 6\nOutput: [1,2]\n\nExample 3:\nInput: nums = [3,3], target = 6\nOutput: [0,1]",
         "expected_concepts": ["hash map", "unordered_map", "complement", "O(N) time", "O(N) space", "two pointers"],
-        "starter_code_cpp": """#include <iostream>
-#include <vector>
-#include <unordered_map>
-using namespace std;
-
-class Solution {
+        "starter_code_cpp": """class Solution {
 public:
     vector<int> twoSum(vector<int>& nums, int target) {
         // Return indices of the two numbers that add up to target
@@ -159,13 +154,7 @@ var reverseList = function(head) {
         "constraints": "- 0 <= s.length <= 5 * 10^4\n- s consists of English letters, digits, symbols and spaces.",
         "examples": "Example 1:\nInput: s = \"abcabcbb\"\nOutput: 3\nExplanation: The answer is \"abc\", with length of 3.\n\nExample 2:\nInput: s = \"bbbbb\"\nOutput: 1\nExplanation: The answer is \"b\", with length of 1.\n\nExample 3:\nInput: s = \"pwwkew\"\nOutput: 3\nExplanation: The answer is \"wke\", with length of 3.",
         "expected_concepts": ["sliding window", "two pointers", "unordered_set", "hash map", "O(N) time"],
-        "starter_code_cpp": """#include <iostream>
-#include <string>
-#include <unordered_map>
-#include <algorithm>
-using namespace std;
-
-class Solution {
+        "starter_code_cpp": """class Solution {
 public:
     int lengthOfLongestSubstring(string s) {
         // Return length of longest substring without repeating characters

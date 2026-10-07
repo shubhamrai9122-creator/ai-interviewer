@@ -14,9 +14,17 @@ export default function ScorecardModal({
 }) {
   if (!isOpen || !result) return null;
 
-  const score = Math.round(result.final_score || result.total_score || 85);
-  const dsaScore = Math.round(result.dsa_score || score * 0.96);
-  const webScore = Math.round(result.web_dev_score || score * 1.04);
+  const isWebTrack = (subjectTitle || '').toLowerCase().includes('web') || 
+                     (evalReport.interview_track === 'webdev');
+  const isDsaTrack = !isWebTrack;
+
+  const score = Math.round(
+    isDsaTrack 
+      ? (result.dsa_score || evalReport.dsa_score || result.final_score || result.total_score || 85)
+      : (result.web_dev_score || evalReport.web_dev_score || result.final_score || result.total_score || 85)
+  );
+  const dsaScore = Math.round(result.dsa_score || evalReport.dsa_score || score);
+  const webScore = Math.round(result.web_dev_score || evalReport.web_dev_score || score);
 
   const evalReport = result.evaluation_report || {};
   const subscores = result.subscores || (evalReport.subscores || {
@@ -29,33 +37,68 @@ export default function ScorecardModal({
     adaptability: 8.4
   });
 
-  const strongestAreas = evalReport.strongest_areas || [
+  const defaultDsaStrong = [
     'Algorithmic problem decomposition and approach selection',
-    'Practical full-stack web architecture and authentication flows'
+    'Rigorous Big-O time and space complexity evaluation',
+    'Clean LeetCode-style solution implementation'
+  ];
+  const defaultWebStrong = [
+    'Practical full-stack web architecture and asynchronous event flows',
+    'Clear explanation of HTTP lifecycle, headers, and state management'
   ];
 
-  const weakestAreas = evalReport.weakest_areas || [
+  const defaultDsaWeak = [
     'Auxiliary memory overhead and space complexity analysis under recursion',
-    'Security mitigations against XSS vs CSRF in token storage'
+    'Anticipating boundary conditions and edge-case counterexamples'
+  ];
+  const defaultWebWeak = [
+    'Security mitigations against XSS vs CSRF in token storage',
+    'Closure scope management and asynchronous event timing'
   ];
 
-  const improvementTopics = evalReport.improvement_topics || [
+  const defaultDsaImprovement = [
     'Two Pointers & Sliding Window edge-case handling',
+    'Hash Table lookup invariants and collision handling',
+    'Time and space amortized complexity analysis'
+  ];
+  const defaultWebImprovement = [
     'HttpOnly cookies with SameSite attributes vs localStorage',
-    'Stateless JWT blacklist caching using Redis with TTL'
+    'Stateless JWT blacklist caching using Redis with TTL',
+    'JavaScript Event Loop (Microtask vs Macrotask queue)'
   ];
 
-  const recommendedTopics = evalReport.recommended_topics || [
+  const defaultDsaRec = [
     'Sliding Window & Monotonic Queue',
-    'JWT Refresh Token Rotation & Redis Caching',
-    'SQL Indexing & Explain Plans'
+    'Binary Tree DFS/BFS Traversal',
+    'Heap / Priority Queue Patterns'
   ];
+  const defaultWebRec = [
+    'JWT Refresh Token Rotation',
+    'SQL Indexing & Explain Plans',
+    'Distributed Caching with Redis'
+  ];
+
+  const strongestAreas = evalReport.strongest_areas?.length > 0 
+    ? evalReport.strongest_areas 
+    : (isDsaTrack ? defaultDsaStrong : defaultWebStrong);
+
+  const weakestAreas = evalReport.weakest_areas?.length > 0 
+    ? evalReport.weakest_areas 
+    : (isDsaTrack ? defaultDsaWeak : defaultWebWeak);
+
+  const improvementTopics = evalReport.improvement_topics?.length > 0 
+    ? evalReport.improvement_topics 
+    : (isDsaTrack ? defaultDsaImprovement : defaultWebImprovement);
+
+  const recommendedTopics = evalReport.recommended_topics?.length > 0 
+    ? evalReport.recommended_topics 
+    : (isDsaTrack ? defaultDsaRec : defaultWebRec);
 
   const suggestedDifficulty = evalReport.suggested_difficulty || 'Intermediate';
 
   const categoryBreakdown = evalReport.category_breakdown || {
-    knowledge_gaps: ['Stateless JWT revocation mechanics'],
-    reasoning_problems: ['Optimal window bounds under edge cases'],
+    knowledge_gaps: isDsaTrack ? ['Formal auxiliary space accounting'] : ['Stateless JWT revocation mechanics'],
+    reasoning_problems: isDsaTrack ? ['Optimal window bounds under edge cases'] : ['Client-side caching vs server-side cache invalidation'],
     implementation_mistakes: ['Boundary condition handling'],
     communication_problems: ['Initial requirements clarification']
   };
@@ -120,13 +163,15 @@ export default function ScorecardModal({
               <span style={{ fontSize: '22px', fontWeight: 800, color: '#008BDC' }}>MSOT</span>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FF6B00', display: 'inline-block' }} />
               <span style={{ height: '16px', width: '1px', background: '#CBD5E1', margin: '0 4px' }} />
-              <span className="is-badge-blue">Mirai School of Technology</span>
+              <span className={isWebTrack ? 'is-badge-orange' : 'is-badge-blue'}>
+                {isWebTrack ? 'Web Development Track' : 'Data Structures & Algorithms (DSA)'}
+              </span>
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1E293B', margin: '4px 0' }}>
-              Official Candidate Evaluation Certificate
+              {isWebTrack ? 'Official Web Development Evaluation Certificate' : 'Official DSA Candidate Evaluation Certificate'}
             </h2>
             <div style={{ fontSize: '13px', color: '#64748B' }}>
-              Candidate: <strong>{studentName}</strong> (ID: {studentId}) • Evaluated by <strong>Ira • MSOT AI Recruiter</strong>
+              Candidate: <strong>{studentName}</strong> (ID: {studentId}) • Track: <strong>{isWebTrack ? 'Web Development' : 'Data Structures & Algorithms'}</strong> • Evaluated by <strong>Ira • MSOT AI Recruiter</strong>
             </div>
           </div>
 
@@ -169,10 +214,10 @@ export default function ScorecardModal({
           }}>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0073B6', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                Overall Industry Readiness Score
+                {isDsaTrack ? 'DSA Technical Readiness Score' : 'Web Development Readiness Score'}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ fontSize: '48px', fontWeight: 800, color: '#008BDC', lineHeight: 1 }}>
+                <span style={{ fontSize: '48px', fontWeight: 800, color: isWebTrack ? '#FF6B00' : '#008BDC', lineHeight: 1 }}>
                   {score}%
                 </span>
                 <span style={{ fontSize: '16px', color: '#64748B', fontWeight: 600 }}>/ 100%</span>
@@ -195,35 +240,37 @@ export default function ScorecardModal({
               </div>
             </div>
 
-            {/* Subject Sub-scores */}
+            {/* Subject Sub-score: ONLY render the chosen track */}
             <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '14px 20px',
-                textAlign: 'center',
-                minWidth: '130px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>DSA Mastery</div>
-                <div style={{ fontSize: '26px', fontWeight: 800, color: '#008BDC', margin: '4px 0' }}>{dsaScore}%</div>
-                <div style={{ fontSize: '11px', color: '#10B981', fontWeight: 600 }}>Algorithms & Complexity</div>
-              </div>
-
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '14px 20px',
-                textAlign: 'center',
-                minWidth: '130px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Web Development</div>
-                <div style={{ fontSize: '26px', fontWeight: 800, color: '#FF6B00', margin: '4px 0' }}>{webScore}%</div>
-                <div style={{ fontSize: '11px', color: '#10B981', fontWeight: 600 }}>Architecture & Auth</div>
-              </div>
+              {isDsaTrack ? (
+                <div style={{
+                  background: '#FFFFFF',
+                  border: '1.5px solid #008BDC',
+                  borderRadius: '10px',
+                  padding: '16px 26px',
+                  textAlign: 'center',
+                  minWidth: '150px',
+                  boxShadow: '0 4px 12px rgba(0, 139, 220, 0.12)'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#0073B6', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DSA Mastery</div>
+                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#008BDC', margin: '4px 0' }}>{dsaScore}%</div>
+                  <div style={{ fontSize: '11px', color: '#10B981', fontWeight: 700 }}>Algorithms & Complexity</div>
+                </div>
+              ) : (
+                <div style={{
+                  background: '#FFFFFF',
+                  border: '1.5px solid #FF6B00',
+                  borderRadius: '10px',
+                  padding: '16px 26px',
+                  textAlign: 'center',
+                  minWidth: '150px',
+                  boxShadow: '0 4px 12px rgba(255, 107, 0, 0.12)'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#EA580C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Web Dev Mastery</div>
+                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#FF6B00', margin: '4px 0' }}>{webScore}%</div>
+                  <div style={{ fontSize: '11px', color: '#10B981', fontWeight: 700 }}>Architecture & Auth</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -297,7 +344,7 @@ export default function ScorecardModal({
           }}>
             <div>
               <div style={{ fontWeight: 700, color: '#1E293B', fontSize: '14px', marginBottom: '4px' }}>
-                Recommended Next Step: {suggestedDifficulty} Track Preparation
+                Recommended Next Step: {suggestedDifficulty} {isDsaTrack ? 'Data Structures & Algorithms' : 'Web Development'} Track Preparation
               </div>
               <div style={{ fontSize: '13px', color: '#64748B' }}>
                 Focus Topics: {recommendedTopics.join(', ')}
