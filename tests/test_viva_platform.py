@@ -220,27 +220,35 @@ class TestAIVivaPlatform(unittest.TestCase):
         s_id = start_res["session_id"]
         self.assertIn("MSOT Code Arena", start_res["first_question"])
         self.assertIn("Devika Sen", start_res["first_question"])
-        self.assertTrue(start_res["is_coding_question"])
+        self.assertFalse(start_res["is_coding_question"])
+        self.assertIn("foundational technical question", start_res["first_question"].lower())
 
-        # 2. Turn 1: Candidate requests a hint
+        # 2. Turn 1: Candidate answers initial technical question
         engine = VivaEngine(self.db)
         turn1 = engine.process_turn(
             session_id=s_id,
             elapsed_seconds=30,
-            student_transcript="Could you give me a hint to get started?",
-            is_hint_req=True
+            student_transcript="An array has contiguous memory and O(1) indexed lookup with better cache locality, while a linked list uses pointers and has O(1) insertion."
         )
         self.assertIn("ai_response_text", turn1)
-        self.assertIn("[Hint]", turn1["ai_response_text"])
-        self.assertEqual(turn1["hints_used"], 1)
+        self.assertFalse(turn1["is_coding_question"])
 
-        # 3. Turn 2: Candidate explains approach before code
+        # 3. Turn 2: Candidate answers follow-up technical question and transitions to Code Arena
         turn2 = engine.process_turn(
             session_id=s_id,
             elapsed_seconds=90,
-            student_transcript="I observe that we can maintain a timerId variable in a closure and clearTimeout on each call."
+            student_transcript="Hash map provides O(1) average lookup using hashing, while std::map provides O(log N) ordered traversal. Let's move to the code arena."
         )
-        self.assertIn("code editor", turn2["ai_response_text"].lower())
+        self.assertTrue(turn2["is_coding_question"])
+        self.assertIn("code arena", turn2["ai_response_text"].lower())
+
+        # 4. Turn 3: Candidate explains approach before code
+        turn3 = engine.process_turn(
+            session_id=s_id,
+            elapsed_seconds=150,
+            student_transcript="I observe that we can maintain a hash map of seen elements to find the complement in linear time."
+        )
+        self.assertIn("code editor", turn3["ai_response_text"].lower())
 
         # 7. Turn 6: Candidate submits code in editor (Section 13)
         code = "def lengthOfLongestSubstring(s: str) -> int:\n    seen = {}\n    left = 0\n    max_len = 0\n    for right, c in enumerate(s):\n        if c in seen and seen[c] >= left:\n            left = seen[c] + 1\n        seen[c] = right\n        max_len = max(max_len, right - left + 1)\n    return max_len"
@@ -312,14 +320,14 @@ class TestAIVivaPlatform(unittest.TestCase):
         start_res = start_viva_session(start_req, db=self.db)
         self.assertIn("From Candidate's Uploaded Syllabus", start_res["first_question"])
         self.assertIn("My Advanced Graph Algorithms Notes", start_res["first_question"])
-        self.assertTrue(start_res["is_coding_question"])
+        self.assertFalse(start_res["is_coding_question"])
         self.assertIsNotNone(start_res["coding_problem_details"])
 
         engine = VivaEngine(self.db)
         turn1 = engine.process_turn(
             session_id=start_res["session_id"],
             elapsed_seconds=45.0,
-            student_transcript="In graph traversal, BFS explores level by level using a queue while DFS explores paths with recursion."
+            student_transcript="In graph traversal, BFS explores level by level using a queue while DFS explores paths with recursion. Let's move to the code arena."
         )
         self.assertIn("ai_response_text", turn1)
         self.assertTrue(turn1["is_coding_question"])

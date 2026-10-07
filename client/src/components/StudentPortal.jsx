@@ -52,7 +52,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const [isHintRevealed, setIsHintRevealed] = useState(false);
   const [isIraConsoleExpanded, setIsIraConsoleExpanded] = useState(true);
 
-  // Proctoring & Anti-Cheat Tab Switch States (Strict 3-Switch Rule)
+  // Proctoring & Anti-Cheat Tab Switch States (Strict 5-Switch Rule)
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isTabLocked, setIsTabLocked] = useState(false);
   const [isTerminatedDueToTabs, setIsTerminatedDueToTabs] = useState(false);
@@ -60,8 +60,8 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const [showEndConfirmModal, setShowEndConfirmModal] = useState(false);
   const tabSwitchCountRef = useRef(0);
 
-  // Dynamic Coding Question Views
-  const [isCodingQuestion, setIsCodingQuestion] = useState(true);
+  // Dynamic Coding Question Views (Starts in Technical Round, then advances to MSOT Code Arena)
+  const [isCodingQuestion, setIsCodingQuestion] = useState(false);
   const [shouldAskToRead, setShouldAskToRead] = useState(false);
   const [codingProblemDetails, setCodingProblemDetails] = useState(null);
 
@@ -77,7 +77,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   const handleTurnSubmitRef = useRef(null);
   const isAiSpeakingRef = useRef(false);
 
-  // Strict Tab Switch / Window Blur Lockdown (Auto-Ends Interview on 3rd Switch)
+  // Strict Tab Switch / Window Blur Lockdown (Auto-Ends Interview on 5th Switch)
   useEffect(() => {
     if (!isStarted || vivaCompleted) return;
 
@@ -101,14 +101,14 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
               metadata_json: {
                 violation_count: nextCount,
                 timestamp: Date.now(),
-                note: `Candidate attempted tab switch / window blur (#${nextCount}/3)`
+                note: `Candidate attempted tab switch / window blur (#${nextCount}/5)`
               }
             })
           }).catch(err => console.warn("Failed to log integrity event:", err));
         }
 
-        // Hard enforcement: after 3 tab switches, immediately terminate interview!
-        if (nextCount >= 3) {
+        // Hard enforcement: after 5 tab switches, immediately terminate interview!
+        if (nextCount >= 5) {
           setIsTerminatedDueToTabs(true);
           handleEndInterview();
         }
@@ -358,10 +358,11 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
   // Submit Turn (Candidate response)
   const handleTurnSubmit = async (options = {}) => {
     if (isSubmitting || !sessionId) return;
-    const { isHint = false, isGiveUp = false, explicitText = null } = options;
+    const { isHint = false, isGiveUp = false, explicitText = null, codeSnippet = null } = options;
 
     const transcriptText = (explicitText !== null ? explicitText : studentInput).trim();
-    if (!transcriptText && !isHint && !isGiveUp && !codeContent.trim()) {
+    const effectiveCode = codeSnippet !== null ? codeSnippet : codeContent;
+    if (!transcriptText && !isHint && !isGiveUp && !effectiveCode.trim()) {
       alert("Please provide an explanation or code snippet before submitting.");
       return;
     }
@@ -387,7 +388,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
           is_silence: false,
           is_giveup: isGiveUp,
           is_hint_request: isHint,
-          code_snippet: codeContent
+          code_snippet: effectiveCode
         })
       });
 
@@ -754,19 +755,19 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  1. Direct Problem Start
+                  1. Technical Concepts Round
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  The interview starts directly with your technical coding problem. No introductory or warmup questions are asked.
+                  The interview begins with focused technical questions on core foundations before transitioning into the live MSOT Code Arena.
                 </div>
               </div>
 
               <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ fontWeight: 700, color: '#008BDC', fontSize: '14px', marginBottom: '6px' }}>
-                  2. Strict 3 Tab Switch Limit
+                  2. Strict 5 Tab Switch Limit
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
-                  Tab switching is strictly monitored. On your <strong>3rd tab switch</strong>, the interview is immediately terminated and flagged.
+                  Tab switching is strictly monitored. On your <strong>5th tab switch</strong>, the interview is immediately terminated and flagged.
                 </div>
               </div>
 
@@ -809,7 +810,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                     I agree to the Mirai School of Technology (MSOT) Code Arena Honor Code
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    I declare that this interview will be taken without unauthorized external assistance, and I acknowledge that switching tabs 3 times will result in immediate disqualification.
+                    I declare that this interview will be taken without unauthorized external assistance, and I acknowledge that switching tabs 5 times will result in immediate disqualification.
                   </div>
                 </div>
               </label>
@@ -900,8 +901,8 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
               <span style={{ color: '#64748B' }}>Tab Switch Violations:</span>
-              <strong style={{ color: tabSwitchCount === 0 ? '#10B981' : tabSwitchCount < 3 ? '#F59E0B' : '#DC2626' }}>
-                {tabSwitchCount} / 3 {tabSwitchCount >= 3 ? '(Flagged by Proctor)' : ''}
+              <strong style={{ color: tabSwitchCount === 0 ? '#10B981' : tabSwitchCount < 5 ? '#F59E0B' : '#DC2626' }}>
+                {tabSwitchCount} / 5 {tabSwitchCount >= 5 ? '(Flagged by Proctor)' : ''}
               </strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
@@ -940,6 +941,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
               setTranscriptFeed([]);
               setHintsUsed(0);
               setIsHintRevealed(false);
+              setIsCodingQuestion(false);
             }}
             className="is-btn-primary"
             style={{ padding: '12px 28px', fontSize: '14px' }}
@@ -1012,21 +1014,21 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             {selectedDomain === 'webdev' ? 'Web Development Track' : 'DSA Track (C++)'}
           </span>
 
-          {/* Anti-Cheating Tab Switch Proctor Badge (Hard limit: 3) */}
+          {/* Anti-Cheating Tab Switch Proctor Badge (Hard limit: 5) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             padding: '4px 10px',
             borderRadius: '6px',
-            background: tabSwitchCount === 0 ? '#ECFDF5' : tabSwitchCount < 2 ? '#FFFBEB' : '#FEF2F2',
-            border: `1px solid ${tabSwitchCount === 0 ? '#A7F3D0' : tabSwitchCount < 2 ? '#FDE68A' : '#FECACA'}`,
+            background: tabSwitchCount === 0 ? '#ECFDF5' : tabSwitchCount < 4 ? '#FFFBEB' : '#FEF2F2',
+            border: `1px solid ${tabSwitchCount === 0 ? '#A7F3D0' : tabSwitchCount < 4 ? '#FDE68A' : '#FECACA'}`,
             fontSize: '12px',
             fontWeight: 700,
-            color: tabSwitchCount === 0 ? '#065F46' : tabSwitchCount < 2 ? '#B45309' : '#DC2626'
+            color: tabSwitchCount === 0 ? '#065F46' : tabSwitchCount < 4 ? '#B45309' : '#DC2626'
           }}>
             <Shield size={14} />
-            <span>Tab Switches: {tabSwitchCount} / 3 (Auto-terminates at 3)</span>
+            <span>Tab Switches: {tabSwitchCount} / 5 (Auto-terminates at 5)</span>
           </div>
         </div>
 
@@ -1119,8 +1121,304 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
         </div>
       </div>
 
-      {/* 2. DOCKED IRA AI RECRUITER DISCUSSION DRAWER */}
-      {isIraConsoleExpanded && (
+      {!isCodingQuestion ? (
+        /* =========================================================================
+           ROUND 1: TECHNICAL & ARCHITECTURAL FOUNDATIONS (BEFORE CODE ARENA)
+           ========================================================================= */
+        <div style={{
+          maxWidth: '960px',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          paddingBottom: '40px'
+        }}>
+          {/* Round Header / Status Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+            borderRadius: '12px',
+            padding: '20px 24px',
+            color: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{
+                  background: '#008BDC',
+                  color: '#FFFFFF',
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Round 1 of 2
+                </span>
+                <span style={{ fontSize: '13px', color: '#94A3B8' }}>
+                  {selectedDomain === 'webdev' ? 'Web Systems Architecture' : 'Data Structures & Algorithms Foundations'}
+                </span>
+              </div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>
+                Technical Concept Assessment
+              </h2>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#CBD5E1' }}>
+                Ira is assessing your foundational depth and algorithmic intuition. Answer via voice or text before entering the live MSOT Code Arena.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleTurnSubmit({
+                  explicitText: "Let's move directly to the live MSOT Code Arena hands-on coding problem."
+                });
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                background: '#10B981',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <span>🚀 Jump to Code Arena</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+
+          {/* Ira's Recruiter Question Card */}
+          <div style={{
+            background: '#FFFFFF',
+            border: '1.5px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '24px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: '#EBF5FB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px'
+                }}>
+                  👩‍💼
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#1E293B' }}>
+                    Ira • MSOT AI Recruiter
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>
+                    {isAiSpeaking ? 'Speaking question aloud...' : 'Awaiting your technical explanation'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isAiSpeaking && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginRight: '6px' }}>
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                    <span className="is-wave-bar" style={{ height: '16px' }} />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => speakText(aiQuestion)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Volume2 size={14} /> Replay Audio
+                </button>
+              </div>
+            </div>
+
+            {/* Prompt Box */}
+            <div style={{
+              background: '#F8FAFC',
+              border: '1.5px solid #CBD5E1',
+              borderRadius: '8px',
+              padding: '16px 20px',
+              fontSize: '15px',
+              lineHeight: 1.6,
+              color: '#0F172A',
+              fontWeight: 500,
+              marginBottom: '20px'
+            }}>
+              {aiQuestion || "Let's begin with our technical round. Please introduce your approach."}
+            </div>
+
+            {/* Candidate Response Section */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                  Your Explanation / Response:
+                </span>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>
+                  {isListening ? '🎙️ Listening via microphone...' : 'Type below or click Speak Answer'}
+                </span>
+              </div>
+
+              <textarea
+                value={studentInput}
+                onChange={(e) => setStudentInput(e.target.value)}
+                placeholder="Explain the technical concepts, trade-offs, internal mechanics, and time/space complexity here..."
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '8px',
+                  border: isListening ? '2px solid #EF4444' : '1px solid #CBD5E1',
+                  boxSizing: 'border-box',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  lineHeight: 1.5,
+                  outline: 'none',
+                  resize: 'vertical',
+                  marginBottom: '14px',
+                  background: isListening ? '#FEF2F2' : '#FFFFFF',
+                  color: '#1E293B'
+                }}
+              />
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    background: isListening ? '#EF4444' : '#008BDC',
+                    color: '#FFFFFF',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0, 139, 220, 0.25)'
+                  }}
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                  <span>{isListening ? 'Stop Recording' : '🎙️ Speak Answer'}</span>
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTurnSubmit({
+                        explicitText: "Let's proceed directly to the hands-on coding arena."
+                      });
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      background: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      color: '#475569',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Proceed to Coding ➔
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTurnSubmit()}
+                    disabled={isSubmitting || !studentInput.trim()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 22px',
+                      borderRadius: '8px',
+                      background: (isSubmitting || !studentInput.trim()) ? '#94A3B8' : '#008BDC',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: (isSubmitting || !studentInput.trim()) ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 6px rgba(0, 139, 220, 0.3)'
+                    }}
+                  >
+                    <span>{isSubmitting ? 'Evaluating...' : 'Submit Answer to Ira ▶'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transcript Log of the Technical Round */}
+          {transcriptFeed.length > 0 && (
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '12px',
+              padding: '18px 24px',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '12px' }}>
+                Round 1 Discussion Transcript:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '240px', overflowY: 'auto' }}>
+                {transcriptFeed.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      background: item.speaker === 'candidate' ? '#EFF6FF' : '#F8FAFC',
+                      border: `1px solid ${item.speaker === 'candidate' ? '#BFDBFE' : '#E2E8F0'}`,
+                      fontSize: '13px',
+                      lineHeight: 1.5,
+                      color: '#1E293B'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '11px', color: item.speaker === 'candidate' ? '#1D4ED8' : '#475569', marginBottom: '3px' }}>
+                      {item.speaker === 'candidate' ? `You (${studentName})` : 'Ira (AI Recruiter)'}
+                    </div>
+                    <div>{item.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 2. DOCKED IRA AI RECRUITER DISCUSSION DRAWER */}
+          {isIraConsoleExpanded && (
         <div style={{
           background: '#FFFFFF',
           border: '1px solid #E2E8F0',
@@ -1553,11 +1851,16 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
             onChange={(newCode) => setCodeContent(newCode)}
             onSubmitSolution={(subCode) => {
               setCodeContent(subCode);
-              handleTurnSubmit({ explicitText: "I have implemented, tested, and submitted my solution in the code editor." });
+              handleTurnSubmit({
+                explicitText: "I have implemented, tested, and submitted my solution in the code editor.",
+                codeSnippet: subCode
+              });
             }}
           />
         </div>
       </div>
+        </>
+      )}
 
       {/* Top Cursor Exit Warning Banner */}
       {cursorExitWarning && !isTabLocked && (
@@ -1623,7 +1926,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   INTERVIEW TERMINATED & FLAGGED
                 </h2>
                 <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 18px' }}>
-                  You have switched tabs <strong>3 times</strong>. According to MSOT exam policy, your interview session has been permanently <strong>terminated and submitted</strong> for proctor audit.
+                  You have switched tabs <strong>5 times</strong>. According to MSOT exam policy, your interview session has been permanently <strong>terminated and submitted</strong> for proctor audit.
                 </p>
 
                 <div style={{
@@ -1634,7 +1937,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   marginBottom: '24px'
                 }}>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#B91C1C' }}>
-                    Final Disqualification: 3 / 3 Tab Switches Exceeded
+                    Final Disqualification: 5 / 5 Tab Switches Exceeded
                   </div>
                   <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
                     All integrity events and screen blurs have been recorded in your official candidate evaluation dossier.
@@ -1668,7 +1971,7 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                 </h2>
                 <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.6, margin: '0 0 18px' }}>
                   You are taking an active proctored <strong>MSOT Code Arena</strong> AI Interview.
-                  Leaving this tab or switching windows is strictly forbidden. <strong>After 3 switches, your interview will be immediately ended!</strong>
+                  Leaving this tab or switching windows is strictly forbidden. <strong>After 5 switches, your interview will be immediately ended!</strong>
                 </p>
 
                 <div style={{
@@ -1679,10 +1982,10 @@ export default function StudentPortal({ initialSyllabus, onNavigateToTraining })
                   marginBottom: '24px'
                 }}>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#B91C1C' }}>
-                    Proctor Alert: Tab Switch #{tabSwitchCount} / 3 Blocked & Logged
+                    Proctor Alert: Tab Switch #{tabSwitchCount} / 5 Blocked & Logged
                   </div>
                   <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: '4px' }}>
-                    {3 - tabSwitchCount} warning{3 - tabSwitchCount === 1 ? '' : 's'} remaining before automated session termination.
+                    {5 - tabSwitchCount} warning{5 - tabSwitchCount === 1 ? '' : 's'} remaining before automated session termination.
                   </div>
                 </div>
 

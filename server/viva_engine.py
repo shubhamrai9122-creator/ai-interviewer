@@ -517,6 +517,38 @@ class VivaEngine:
             h_msg = f"That's completely fine. Here is a hint to guide you: {problem['hints'][0]}\n\nWhat comes to mind when you consider that?"
             return (h_msg, h_msg, True, False, problem, None, QuestionType.CONCEPT, profile)
 
+        # STAGE: Foundational Technical Concept Question 1
+        if stage in ["INTRO", "WARMUP", "TECHNICAL_CONCEPT_1"]:
+            if any(w in lowered_input for w in ["code arena", "solve coding", "move to coding", "coding problem", "let's code", "open editor", "start coding"]):
+                profile["stage"] = "CODING_APPROACH_DISCUSSION"
+                msg = (
+                    f"Certainly! Let's move directly to our live MSOT Code Arena. I have loaded your problem: {problem['title']}. "
+                    "Review the statement, constraints, and test cases on the left. Please explain your proposed approach, then implement your solution in the code editor on the right."
+                )
+                return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
+
+            profile["stage"] = "TECHNICAL_CONCEPT_2"
+            if preferred_domain == "webdev":
+                msg = (
+                    "Spot on! Following up on that: In modern React applications, why is direct state mutation discouraged, "
+                    "and how does React's Virtual DOM reconciliation and Fiber architecture optimize UI updates without re-rendering the whole tree?"
+                )
+            else:
+                msg = (
+                    "Great technical explanation! Following up on that: When designing high-performance applications, "
+                    "when would you choose an unordered_map (hash table) over a balanced binary search tree (std::map), and what are the trade-offs regarding memory overhead and worst-case lookup complexity?"
+                )
+            return (msg, msg, False, False, problem, None, QuestionType.WHY, profile)
+
+        # STAGE: Foundational Technical Concept Question 2 -> Advance to MSOT Code Arena!
+        if stage in ["GENERAL_CONCEPT_1", "GENERAL_CONCEPT_2", "TECHNICAL_CONCEPT_2"]:
+            profile["stage"] = "CODING_APPROACH_DISCUSSION"
+            msg = (
+                f"Excellent technical analysis! Now let's move directly to our live MSOT Code Arena to solve a hands-on problem: {problem['title']}. "
+                "Review the statement, constraints, and test cases on the left. Please explain your proposed approach and Big-O complexity, then implement your solution in the code editor on the right."
+            )
+            return (msg, msg, True, False, problem, None, QuestionType.TRADE_OFF, profile)
+
         # STAGE: Candidate Explains Initial Approach
         if stage in ["CODING_PRESENTED", "CODING_APPROACH_DISCUSSION"]:
             if code_snippet and len(student_transcript.split()) < 8:

@@ -706,7 +706,7 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         }
 
     session.interview_profile = {
-        "stage": "CODING_APPROACH_DISCUSSION",
+        "stage": "TECHNICAL_CONCEPT_1",
         "preferred_domain": "webdev" if is_web else "dsa",
         "coding_problem_id": problem["id"],
         "hints_used": 0,
@@ -718,19 +718,23 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
     db.refresh(session)
 
     syllabus_mention = f" [From Candidate's Uploaded Syllabus: {active_s.title}]" if active_s and active_s.generated_questions else ""
-    opener_text = (
-        f"Welcome {session.student_name} to MSOT Code Arena! "
-        f"We will begin directly with your technical problem{syllabus_mention}: {problem['title']}. "
-        "Review the statement, constraints, and test cases on your screen. "
-        "Please explain your proposed approach and Big-O complexity, then implement your solution in the editor on the right."
-    )
+    if is_web:
+        opener_text = (
+            f"Welcome {session.student_name} to MSOT Code Arena. Let's start with a foundational technical question in Web Systems: "
+            "How does the JavaScript Event Loop process asynchronous operations, and what is the difference between the microtask queue (e.g. Promises) and the macrotask queue (e.g. setTimeout)?"
+        )
+    else:
+        opener_text = (
+            f"Welcome {session.student_name} to MSOT Code Arena!{syllabus_mention} Let's begin with a foundational technical question in Data Structures & Algorithms: "
+            "How does an array differ from a singly linked list in terms of contiguous memory layout, CPU cache locality, and algorithmic time complexity for insertion versus indexed lookup?"
+        )
 
     first_qa = QuestionAsked(
         session_id=session.id,
         question_id=None,
         question_text=opener_text,
         timestamp_sec=0.0,
-        phase=SessionPhase.DEPTH,
+        phase=SessionPhase.FUNDAMENTALS,
         question_type=QuestionType.CONCEPT
     )
     db.add(first_qa)
@@ -744,13 +748,13 @@ def start_viva_session(req: StudentStartRequest, db: Session = Depends(get_db)):
         "first_question": opener_text,
         "initial_prompt": opener_text,
         "question_type": QuestionType.CONCEPT.value,
-        "phase": SessionPhase.DEPTH.value,
+        "phase": SessionPhase.FUNDAMENTALS.value,
         "elapsed_seconds": 0.0,
         "examiner_persona": persona_key,
         "subject_domain": subject_label,
         "active_syllabus_id": active_s.id if active_s else None,
         "active_syllabus_title": active_s.title if active_s else None,
-        "is_coding_question": True,
+        "is_coding_question": False,
         "should_ask_to_read": False,
         "coding_problem_details": problem
     }

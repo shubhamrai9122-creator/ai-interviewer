@@ -293,6 +293,11 @@ export default function HackerRankCodeEditor({
     }
   };
 
+  const handleSubmit = async () => {
+    await handleRunCode();
+    onSubmitSolution(code);
+  };
+
   const lines = (code || '').split('\n');
   const activeTestCase = testCases[selectedTestCaseIndex] || testCases[0];
 
@@ -452,7 +457,8 @@ export default function HackerRankCodeEditor({
           {/* Submit Button (Bright Green pill) */}
           <button
             type="button"
-            onClick={() => onSubmitSolution(code)}
+            onClick={handleSubmit}
+            disabled={isRunning}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -464,12 +470,12 @@ export default function HackerRankCodeEditor({
               borderRadius: '5px',
               fontSize: '12px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isRunning ? 'not-allowed' : 'pointer',
               boxShadow: '0 1px 3px rgba(44, 187, 93, 0.2)'
             }}
           >
             <Send size={11} />
-            Submit
+            {isRunning ? 'Submitting...' : 'Submit'}
           </button>
         </div>
       </div>
@@ -790,6 +796,26 @@ export default function HackerRankCodeEditor({
                       color: '#1F2937'
                     }}>
                       {activeTestCase.inputValue2}
+                    </div>
+                  </div>
+                )}
+
+                {activeTestCase.expected && (
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', fontFamily: 'monospace' }}>
+                      Output:
+                    </div>
+                    <div style={{
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      color: '#059669',
+                      fontWeight: 700
+                    }}>
+                      {activeTestCase.expected}
                     </div>
                   </div>
                 )}
